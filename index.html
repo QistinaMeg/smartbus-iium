@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>IIUM Live Bus Tracker</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -28,12 +27,42 @@
       gap: 8px;
     }
 
+    .user-btn {
+      position: absolute;
+      bottom: 30px;
+      left: 20px;
+      z-index: 1000;
+      background: white;
+      border: none;
+      border-radius: 50px;
+      padding: 12px 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
     .live-dot {
       width: 10px;
       height: 10px;
       background-color: #22c55e;
       border-radius: 50%;
       animation: pulse 1.5s infinite;
+    }
+
+    .info-btn {
+      display: inline-block;
+      margin-top: 8px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: bold;
     }
 
     @keyframes pulse {
@@ -47,8 +76,12 @@
 
   <div class="status-card">
     <div class="live-dot"></div>
-    <span id="status-text">Connecting to Bus...</span>
+    <span id="status-text">Waiting for Bus Signal...</span>
   </div>
+
+  <button class="user-btn" onclick="locateUser()">
+    👤 Share Location / Nearest Stop
+  </button>
 
   <div id="map"></div>
 
@@ -57,55 +90,54 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // 1. DEFINE DISTINCT ICONS
-    const busIcon = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
+    // 1. CUSTOM SVG ICONS FOR BUS, STOP, AND PERSON
+    const busIcon = L.divIcon({
+      html: `<div style="font-size:26px;">🚌</div>`,
+      className: 'custom-icon', iconSize: [30, 30], iconAnchor: [15, 15]
     });
 
-    const stopIcon = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34],
-      shadowSize: [41, 41]
+    const stopIcon = L.divIcon({
+      html: `<div style="font-size:24px;">🚏</div>`,
+      className: 'custom-icon', iconSize: [25, 25], iconAnchor: [12, 12]
     });
 
-    // 2. IIUM BUS STOPS
+    const personIcon = L.divIcon({
+      html: `<div style="font-size:26px;">🚶</div>`,
+      className: 'custom-icon', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+
+    // 2. IIUM BUS STOPS WITH GOOGLE MAPS STREETVIEW / MAP LINKS
     const busStops = [
-      { id: "kaed", name: "KAED (Architecture)", lat: 3.25044, lng: 101.73106, radius: 40 },
-      { id: "koe", name: "KOE (Engineering)", lat: 3.25419, lng: 101.73169, radius: 40 },
-      { id: "koed", name: "KOED (Education)", lat: 3.25406, lng: 101.73325, radius: 40 },
-      { id: "irkhs", name: "IRKHS", lat: 3.25556, lng: 101.73519, radius: 40 },
-      { id: "lib", name: "Perpustakaan UIAM", lat: 3.25194, lng: 101.73469, radius: 40 }
+      { id: "kaed", name: "KAED (Architecture)", lat: 3.25044, lng: 101.73106, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25044,101.73106" },
+      { id: "koe", name: "KOE (Engineering)", lat: 3.25419, lng: 101.73169, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25419,101.73169" },
+      { id: "koed", name: "KOED (Education)", lat: 3.25406, lng: 101.73325, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25406,101.73325" },
+      { id: "irkhs", name: "IRKHS", lat: 3.25556, lng: 101.73519, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25556,101.73519" },
+      { id: "lib", name: "Perpustakaan UIAM", lat: 3.25194, lng: 101.73469, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25194,101.73469" }
     ];
 
-    // Initialize Map
     const map = L.map('map', { zoomControl: false }).setView([3.2535, 101.7330], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    const stopPopups = {};
+    const stopMarkers = {};
+    const activeBuses = {};
+    let userMarker = null;
 
-    // Draw Stops with Blue Markers
+    // Draw Stops
     busStops.forEach(stop => {
       const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon }).addTo(map);
       
       L.circle([stop.lat, stop.lng], {
-        color: '#2563eb',
-        fillColor: '#3b82f6',
-        fillOpacity: 0.15,
-        radius: stop.radius
+        color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, radius: stop.radius
       }).addTo(map);
 
-      const popup = L.popup().setContent(`<b>${stop.name}</b><br/>Status: Waiting for bus update...`);
-      marker.bindPopup(popup);
-      stopPopups[stop.id] = popup;
+      marker.bindPopup(`
+        <b>${stop.name}</b><br/>
+        Estimated Arrival: <i>Waiting for active buses...</i><br/>
+        <a href="${stop.mapsUrl}" target="_blank" class="info-btn">ⓘ 360° / View Stop Photo</a>
+      `);
+      
+      stopMarkers[stop.id] = marker;
     });
 
     function getDistanceInMeters(lat1, lon1, lat2, lon2) {
@@ -115,13 +147,49 @@
       const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    let busMarker = null;
+    // 3. MANUAL LOCATION SHARING
+    function locateUser() {
+      if (!("geolocation" in navigator)) {
+        alert("Geolocation not supported by your browser.");
+        return;
+      }
 
-    // Firebase Config
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const uLat = pos.coords.latitude;
+        const uLng = pos.coords.longitude;
+
+        if (!userMarker) {
+          userMarker = L.marker([uLat, uLng], { icon: personIcon }).addTo(map);
+        } else {
+          userMarker.setLatLng([uLat, uLng]);
+        }
+
+        // Find Nearest Stop
+        let nearestStop = null;
+        let minDistance = Infinity;
+
+        busStops.forEach(stop => {
+          const dist = getDistanceInMeters(uLat, uLng, stop.lat, stop.lng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearestStop = stop;
+          }
+        });
+
+        map.setView([uLat, uLng], 17);
+        userMarker.bindPopup(`
+          <b>Your Location</b><br/>
+          Nearest Stop: <b>${nearestStop.name}</b> (${Math.round(minDistance)}m away)
+        `).openPopup();
+      }, (err) => {
+        alert("Unable to fetch location: " + err.message);
+      });
+    }
+
+    // 4. FIREBASE REALTIME LISTENERS (RUQAYYAH & SALAHUDDIN)
     const firebaseConfig = {
       apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
       authDomain: "smartbus-iium.firebaseapp.com",
@@ -134,35 +202,51 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    db.collection("buses").doc("campus_bus_1").onSnapshot((doc) => {
-      const bus = doc.data();
-      if (!bus) return;
+    db.collection("buses").onSnapshot((snapshot) => {
+      let activeNames = [];
 
-      document.getElementById("status-text").innerText = "Bus 1: Active";
+      snapshot.forEach(doc => {
+        const bus = doc.data();
+        if (!bus.lat || !bus.lng) return;
 
-      // Draw Bus with Red Marker
-      if (!busMarker) {
-        busMarker = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map).bindPopup("<b>Campus Bus 1</b>");
-      } else {
-        busMarker.setLatLng([bus.lat, bus.lng]);
+        activeNames.push(bus.name);
+
+        if (!activeBuses[bus.name]) {
+          activeBuses[bus.name] = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map)
+            .bindPopup(`<b>Bus ${bus.name}</b>`);
+        } else {
+          activeBuses[bus.name].setLatLng([bus.lat, bus.lng]);
+        }
+      });
+
+      if (activeNames.length > 0) {
+        document.getElementById("status-text").innerText = `Active Buses: ${activeNames.join(", ")}`;
       }
 
+      // Update Stop ETAs based on closest active bus
       busStops.forEach(stop => {
-        const distanceMeters = getDistanceInMeters(bus.lat, bus.lng, stop.lat, stop.lng);
+        let minEta = Infinity;
+        let closestBusName = "";
 
-        if (distanceMeters <= stop.radius) {
-          stopPopups[stop.id].setContent(`
-            <b>${stop.name}</b><br/>
-            Status: <b style="color: #22c55e;">BUS AT STATION (Boarding)</b>
-          `);
-        } else {
-          const distanceKm = distanceMeters / 1000;
-          const speedKmH = (bus.speed > 5) ? bus.speed : 18; 
-          const etaMinutes = Math.round((distanceKm / speedKmH) * 60);
+        snapshot.forEach(doc => {
+          const bus = doc.data();
+          const distMeters = getDistanceInMeters(bus.lat, bus.lng, stop.lat, stop.lng);
+          const distKm = distMeters / 1000;
+          const speedKmH = (bus.speed > 5) ? bus.speed : 18;
+          const eta = Math.round((distKm / speedKmH) * 60);
 
-          stopPopups[stop.id].setContent(`
+          if (eta < minEta) {
+            minEta = eta;
+            closestBusName = bus.name;
+          }
+        });
+
+        const marker = stopMarkers[stop.id];
+        if (minEta !== Infinity) {
+          marker.setPopupContent(`
             <b>${stop.name}</b><br/>
-            ETA: <b>${etaMinutes} mins</b> (${Math.round(distanceMeters)}m away)
+            Next Arrival: <b>${minEta} mins</b> (${closestBusName})<br/>
+            <a href="${stop.mapsUrl}" target="_blank" class="info-btn">ⓘ 360° / View Stop Photo</a>
           `);
         }
       });
