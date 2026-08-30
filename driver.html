@@ -4,23 +4,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IIUM Bus Driver Transmitter</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 40px 20px; }
-    button { padding: 15px 30px; font-size: 18px; background: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-    #status { margin-top: 20px; font-weight: bold; font-size: 16px; line-height: 1.5; }
+    body { font-family: sans-serif; text-align: center; padding: 40px 20px; background: #f8fafc; }
+    .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+    select, button { width: 100%; padding: 12px; font-size: 16px; margin-top: 12px; border-radius: 8px; border: 1px solid #cbd5e1; }
+    button { background: #22c55e; color: white; border: none; font-weight: bold; cursor: pointer; }
+    #status { margin-top: 20px; font-weight: bold; font-size: 15px; color: #334155; line-height: 1.5; }
   </style>
 </head>
 <body>
 
-  <h2>IIUM Bus Driver Panel</h2>
-  <button onclick="startTracking()">Start Route Broadcast</button>
-  <p id="status">Status: Offline</p>
+  <div class="card">
+    <h2>IIUM Driver Panel</h2>
+    
+    <label for="busSelect"><b>Select Bus Name:</b></label>
+    <select id="busSelect">
+      <option value="RUQAYYAH">Bus RUQAYYAH</option>
+      <option value="SALAHUDDIN">Bus SALAHUDDIN</option>
+    </select>
 
-  <!-- Firebase Libraries -->
+    <button onclick="startTracking()">Start Route Broadcast</button>
+    <p id="status">Status: Offline</p>
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // Your actual Firebase Config
     const firebaseConfig = {
       apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
       authDomain: "smartbus-iium.firebaseapp.com",
@@ -34,18 +43,21 @@
     const db = firebase.firestore();
 
     function startTracking() {
+      const busId = document.getElementById("busSelect").value;
+
       if (!("geolocation" in navigator)) {
         alert("GPS is not supported on this device/browser.");
         return;
       }
 
-      document.getElementById("status").innerText = "Requesting GPS Access...";
+      document.getElementById("status").innerText = `Requesting GPS for Bus ${busId}...`;
 
       navigator.geolocation.watchPosition(
         (pos) => {
           const { latitude, longitude, speed } = pos.coords;
 
-          db.collection("buses").doc("campus_bus_1").set({
+          db.collection("buses").doc(busId).set({
+            name: busId,
             lat: latitude,
             lng: longitude,
             speed: speed || 0,
@@ -53,7 +65,7 @@
           });
 
           document.getElementById("status").innerText = 
-            `Broadcasting Live Location!\nLat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`;
+            `Broadcasting Live Location for ${busId}!\nLat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`;
         },
         (err) => {
           document.getElementById("status").innerText = "GPS Error: " + err.message;
