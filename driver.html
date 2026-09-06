@@ -2,38 +2,37 @@
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IIUM Bus Driver Control</title>
+  <title>SmartBus IIUM - Driver Console</title>
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; background: #f8fafc; color: #1e293b; }
-    .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); max-width: 420px; margin: 0 auto; text-align: left; }
-    label { font-weight: bold; font-size: 14px; margin-top: 14px; display: block; color: #475569; }
-    select, button { width: 100%; padding: 12px; font-size: 15px; margin-top: 6px; border-radius: 8px; border: 1px solid #cbd5e1; box-sizing: border-box; }
-    button.primary { background: #16a34a; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; font-size: 16px; }
-    button.stop { background: #dc2626; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 16px; display: none; }
-    #status { margin-top: 16px; font-weight: bold; font-size: 14px; line-height: 1.4; text-align: center; color: #0284c7; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f8fafc; color: #0f172a; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; margin: 0 auto; }
+    h2 { margin-top: 0; }
+    label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 6px; }
+    select, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; font-size: 15px; border: 1px solid #cbd5e1; }
+    button.btn-start { background: #22c55e; color: white; border: none; font-weight: bold; cursor: pointer; }
+    button.btn-stop { background: #ef4444; color: white; border: none; font-weight: bold; cursor: pointer; display: none; }
+    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #e2e8f0; }
+    .active { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2 style="margin-top:0; text-align:center;">🚌 Driver Broadcast</h2>
+    <h2>🚌 Driver Broadcast</h2>
     
-    <label for="busSelect">1. Select Bus Name</label>
-    <select id="busSelect">
-      <option value="RUQAYYAH">Bus RUQAYYAH</option>
-      <option value="SALAHUDDIN">Bus SALAHUDDIN</option>
+    <label for="terminal">Starting Terminal:</label>
+    <select id="terminal">
+      <option value="Ruqayyah">Ruqayyah</option>
+      <option value="Salahuddin">Salahuddin</option>
+      <option value="Mahallah Asiah">Mahallah Asiah</option>
     </select>
 
-    <label for="occupancySelect">2. Current Bus Occupancy</label>
-    <select id="occupancySelect" onchange="updateOccupancyLive()">
-      <option value="Seats Available">🟢 Seats Available</option>
-      <option value="Standing Room Only">🟡 Standing Room Only</option>
-      <option value="Full / Packed">🔴 Full / Packed</option>
-    </select>
+    <button id="start-btn" class="btn-start" onclick="startAutoSession()">▶ Start Route Broadcast</button>
+    <button id="stop-btn" class="btn-stop" onclick="stopAutoSession()">⏹ Stop Route Broadcast</button>
 
-    <button id="startBtn" class="primary" onclick="startTracking()">Start Route Broadcast</button>
-    <button id="stopBtn" class="stop" onclick="stopTracking()">Stop Broadcast & Go Offline</button>
-    <p id="status">Status: Offline (Select bus and tap Start)</p>
+    <p>Status: <span id="driver-status" class="status-badge">Offline</span></p>
+    <p id="assigned-name" style="font-weight:600; color:#2563eb;"></p>
+    <p id="gps-info" style="font-size:12px; color:#64748b;"></p>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -52,79 +51,94 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    let activeBusId = null;
+    let currentBusDocId = null;
     let watchPositionId = null;
 
-    function updateOccupancyLive() {
-      if (!activeBusId) return;
-      const occupancy = document.getElementById("occupancySelect").value;
-      db.collection("buses").doc(activeBusId).update({ occupancy: occupancy });
-    }
+    async function startAutoSession() {
+      const selectedTerminal = document.getElementById("terminal").value;
 
-    function startTracking() {
-      // 1. Route only starts after choosing bus and pressing Start
-      activeBusId = document.getElementById("busSelect").value;
-      const occupancy = document.getElementById("occupancySelect").value;
+      // 1. Check active buses for this terminal
+      const snapshot = await db.collection("buses")
+        .where("startTerminal", "==", selectedTerminal)
+        .get();
 
-      if (!("geolocation" in navigator)) {
-        alert("GPS unavailable on this device.");
-        return;
+      // 2. Gather currently assigned numbers
+      const activeNumbers = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.busNumber) activeNumbers.push(data.busNumber);
+      });
+
+      // 3. Find lowest free slot (1, 2, 3...)
+      let assignedNumber = 1;
+      while (activeNumbers.includes(assignedNumber)) {
+        assignedNumber++;
       }
 
-      document.getElementById("busSelect").disabled = true;
-      document.getElementById("startBtn").style.display = "none";
-      document.getElementById("stopBtn").style.display = "block";
-      document.getElementById("status").innerText = `Connecting GPS for Bus ${activeBusId}...`;
+      // 4. Form auto name
+      const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
+      currentBusDocId = `bus_${selectedTerminal.toLowerCase().replace(/\s+/g, '_')}_${assignedNumber}`;
 
-      watchPositionId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude, speed } = pos.coords;
-          const speedKmH = speed ? Math.round(speed * 3.6) : 0;
+      // 5. Create document in Firebase
+      await db.collection("buses").doc(currentBusDocId).set({
+        name: autoBusName,
+        startTerminal: selectedTerminal,
+        busNumber: assignedNumber,
+        lat: 3.2592484,
+        lng: 101.7343945,
+        speedKmH: 0,
+        occupancy: "Normal",
+        hasStartedFromRuqayyah: true,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+      });
 
-          // Push live location to Firestore
-          db.collection("buses").doc(activeBusId).set({
-            name: activeBusId,
-            lat: latitude,
-            lng: longitude,
+      // UI Update
+      document.getElementById("driver-status").innerText = "Broadcasting Live";
+      document.getElementById("driver-status").classList.add("active");
+      document.getElementById("assigned-name").innerText = `Assigned: ${autoBusName}`;
+      document.getElementById("start-btn").style.display = "none";
+      document.getElementById("stop-btn").style.display = "block";
+      document.getElementById("terminal").disabled = true;
+
+      // 6. Start watching real GPS
+      if ("geolocation" in navigator) {
+        watchPositionId = navigator.geolocation.watchPosition((pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const speedKmH = Math.round((pos.coords.speed || 0) * 3.6);
+
+          document.getElementById("gps-info").innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)} | Speed: ${speedKmH} km/h`;
+
+          db.collection("buses").doc(currentBusDocId).update({
+            lat: lat,
+            lng: lng,
             speedKmH: speedKmH,
-            occupancy: occupancy,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
           });
-
-          document.getElementById("status").innerText = 
-            `Broadcasting: ${activeBusId}\nSpeed: ${speedKmH} km/h | Status: ${occupancy}`;
-        },
-        (err) => {
-          document.getElementById("status").innerText = "GPS Error: " + err.message;
-        },
-        { enableHighAccuracy: true, maximumAge: 1000 }
-      );
+        }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+      }
     }
 
-    function stopTracking() {
-      if (watchPositionId !== null) {
-        navigator.geolocation.clearWatch(watchPositionId);
-        watchPositionId = null;
+    async function stopAutoSession() {
+      if (watchPositionId) navigator.geolocation.clearWatch(watchPositionId);
+
+      if (currentBusDocId) {
+        await db.collection("buses").doc(currentBusDocId).delete();
+        currentBusDocId = null;
       }
 
-      // Delete bus document from database on manual stop
-      if (activeBusId) {
-        db.collection("buses").doc(activeBusId).delete().then(() => {
-          document.getElementById("status").innerText = `Offline: Bus ${activeBusId} removed from map.`;
-          activeBusId = null;
-        });
-      }
-
-      document.getElementById("busSelect").disabled = false;
-      document.getElementById("startBtn").style.display = "block";
-      document.getElementById("stopBtn").style.display = "none";
+      document.getElementById("driver-status").innerText = "Offline";
+      document.getElementById("driver-status").classList.remove("active");
+      document.getElementById("assigned-name").innerText = "";
+      document.getElementById("gps-info").innerText = "";
+      document.getElementById("start-btn").style.display = "block";
+      document.getElementById("stop-btn").style.display = "none";
+      document.getElementById("terminal").disabled = false;
     }
 
-    // 2. Automatically delete bus document when web browser/tab is closed
+    // Clean up if tab/browser is closed
     window.addEventListener("beforeunload", () => {
-      if (activeBusId) {
-        db.collection("buses").doc(activeBusId).delete();
-      }
+      stopAutoSession();
     });
   </script>
 </body>
