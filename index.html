@@ -118,8 +118,9 @@
     const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
     const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
+    // Index 0 is strictly the start terminal (Ruqayyah)
     const routeLoop = [
-      { id: "ruqayyah_1", name: "Ruqayyah Bus Stop", lat: 3.2592431, lng: 101.7344153, maps: "https://maps.google.com/?q=3.2592431,101.7344153" },
+      { id: "ruqayyah_1", name: "Ruqayyah Bus Stop (Start)", lat: 3.2592431, lng: 101.7344153, maps: "https://maps.google.com/?q=3.2592431,101.7344153" },
       { id: "asiah_1", name: "Asiah", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" },
       { id: "asma_1", name: "Asma", lat: 3.2556537, lng: 101.7331765, maps: "https://maps.google.com/?q=3.2556537,101.7331765" },
       { id: "koed", name: "KOED", lat: 3.2540671, lng: 101.7334601, maps: "https://maps.google.com/?q=3.2540671,101.7334601" },
@@ -216,4 +217,183 @@
       return closestIdx;
     }
 
-    function calculateRouteEta(bus, targetStopIdx
+    function calculateRouteEta(bus, targetStopIdx) {
+      const currentBusIdx = getClosestNodeIndex(bus.lat, bus.lng);
+      const distToRuqayyah = getDistanceInMeters(bus.lat, bus.lng, routeLoop[0].lat, routeLoop[0].lng);
+
+      // RULE 1: ROUTE ORIGIN LOCK
+      // If the bus is positioned at a mid-route node but hasn't reached Ruqayyah (index 0) yet (e.g. > 150m from Ruqayyah),
+      // treat it as inactive/in-transit to start.
+      if (currentBusIdx > 0 && distToRuqayyah > 150 && !bus.hasStartedFromRuqayyah) {
+        return null; 
+      }
+
+      // RULE 2: SINGLE PASS LOOP
+      // Bus cannot service stops behind its active position in a 1-pass cycle
+      if (targetStopIdx < currentBusIdx) {
+        return null;
+      }
+
+      let totalDistanceMeters = 0;
+      let stationCount = 0;
+
+      totalDistanceMeters += getDistanceInMeters(bus.lat, bus.lng, routeLoop[currentBusIdx].lat, routeLoop[currentBusIdx].lng);
+
+      for (let idx = currentBusIdx; idx < targetStopIdx; idx++) {
+        const legDist = (nodeDistancesRoad.length > idx) 
+          ? nodeDistancesRoad[idx] 
+          : getDistanceInMeters(routeLoop[idx].lat, routeLoop[idx].lng, routeLoop[idx + 1].lat, routeLoop[idx + 1].lng);
+        
+        totalDistanceMeters += legDist;
+        stationCount++;
+      }
+
+      const currentLiveSpeed = bus.speedKmH;
+      const effectiveSpeed = (currentLiveSpeed && currentLiveSpeed > 5) ? currentLiveSpeed : 18;
+      
+      const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
+      const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS;
+
+      return {
+        eta: Math.max(0, Math.round(travelTimeMinutes + dwellDelayMinutes)),
+        distanceMeters: Math.round(totalDistanceMeters),
+        intermediateStops: stationCount,
+        liveSpeedUsed: effectiveSpeed
+      };
+    }
+
+    function locateUser() {
+      if (!("geolocation" in navigator)) {
+        alert("Location access unavailable.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const uLat = pos.coords.latitude;
+        const uLng = pos.coords.longitude;
+
+        if (!userMarker) {
+          userMarker = L.marker([uLat, uLng], { icon: personIcon }).addTo(map);
+        } else {
+          userMarker.setLatLng([uLat, uLng]);
+        }
+
+        let nearest = null;
+        let minDist = Infinity;
+
+        routeLoop.forEach(stop => {
+          const dist = getDistanceInMeters(uLat, uLng, stop.lat, stop.lng);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = stop;
+          }
+        });
+
+        map.setView([uLat, uLng], 16);
+        userMarker.bindPopup(`
+          <b>Your Location</b><br/>
+          Nearest Stop: <b>${nearest.name}</b> (${Math.round(minDist)}m)
+        `).openPopup();
+      });
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
+      authDomain: "smartbus-iium.firebaseapp.com",
+      projectId: "smartbus-iium",
+      storageBucket: "smartbus-iium.firebasestorage.app",
+      messagingSenderId: "920517840888",
+      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
+      measurementId: "G-EDHGR3H4X3"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    db.collection("buses").onSnapshot((snapshot) => {
+      let activeList = [];
+      let busDataArray = [];
+      let currentBusNamesInDb = new Set();
+
+      snapshot.forEach(doc => {
+        const bus = doc.data();
+        if (!bus.lat || !bus.lng) return;
+
+        // Auto-mark if bus has touched/passed Ruqayyah start point (within 150m)
+        const distToRuqayyah = getDistanceInMeters(bus.lat, bus.lng, routeLoop[0].lat, routeLoop[0].lng);
+        bus.hasStartedFromRuqayyah = (distToRuqayyah <= 150) || bus.hasStartedFromRuqayyah;
+
+        currentBusNamesInDb.add(bus.name);
+        busDataArray.push(bus);
+        activeList.push(bus.name);
+
+        const popupText = `
+          <b>Bus ${bus.name}</b><br/>
+          Status: <b>${bus.hasStartedFromRuqayyah ? 'En Route' : 'Heading to Ruqayyah Start'}</b><br/>
+          Live Speed: <b>${bus.speedKmH || 0} km/h</b><br/>
+          Occupancy: <b>${bus.occupancy || 'Unknown'}</b>
+        `;
+
+        if (!activeBuses[bus.name]) {
+          activeBuses[bus.name] = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map).bindPopup(popupText);
+        } else {
+          activeBuses[bus.name].setLatLng([bus.lat, bus.lng]).setPopupContent(popupText);
+        }
+      });
+
+      Object.keys(activeBuses).forEach(busName => {
+        if (!currentBusNamesInDb.has(busName)) {
+          map.removeLayer(activeBuses[busName]);
+          delete activeBuses[busName];
+        }
+      });
+
+      document.getElementById("status-text").innerText = activeList.length > 0 
+        ? `Active Fleet: ${activeList.join(", ")}` 
+        : "No Active Buses Broadcasting";
+
+      routeLoop.forEach((stop, targetIdx) => {
+        let minEta = Infinity;
+        let selectedBus = null;
+        let bestRouteDetails = null;
+
+        busDataArray.forEach(bus => {
+          const routeDetails = calculateRouteEta(bus, targetIdx);
+          if (routeDetails && routeDetails.eta < minEta) {
+            minEta = routeDetails.eta;
+            selectedBus = bus;
+            bestRouteDetails = routeDetails;
+          }
+        });
+
+        const marker = stopMarkers[stop.id];
+        if (selectedBus && bestRouteDetails) {
+          const isArriving = bestRouteDetails.distanceMeters <= 100 || minEta <= 1;
+          const etaText = isArriving 
+            ? `<b style="color: #22c55e;">🚌 Arriving Now / At Stop</b>` 
+            : `ETA: <b>${minEta} mins</b> (${bestRouteDetails.distanceMeters}m via road)`;
+
+          marker.setPopupContent(`
+            <div style="font-size:13px;">
+              <b>${stop.name}</b><br/>
+              Next Bus: <b>${selectedBus.name}</b><br/>
+              Status: ${etaText}<br/>
+              Stops Remaining: <b>${bestRouteDetails.intermediateStops}</b><br/>
+              Calc. Speed: <b>${bestRouteDetails.liveSpeedUsed} km/h</b><br/>
+              Occupancy: <b>${selectedBus.occupancy || 'Normal'}</b><br/>
+              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
+            </div>
+          `);
+        } else {
+          marker.setPopupContent(`
+            <div style="font-size:13px;">
+              <b>${stop.name}</b><br/>
+              Status: <i>No active buses...</i><br/>
+              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
+            </div>
+          `);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
