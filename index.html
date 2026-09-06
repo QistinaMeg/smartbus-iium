@@ -118,11 +118,10 @@
     const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
     const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    // Index 0 is strictly the start terminal (Ruqayyah)
     const routeLoop = [
-      { id: "ruqayyah_1", name: "Ruqayyah Bus Stop (Start)", lat: 3.2592431, lng: 101.7344153, maps: "https://maps.google.com/?q=3.2592431,101.7344153" },
-      { id: "asiah_1", name: "Asiah", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" },
-      { id: "asma_1", name: "Asma", lat: 3.2556537, lng: 101.7331765, maps: "https://maps.google.com/?q=3.2556537,101.7331765" },
+      { id: "ruqayyah_start", name: "Ruqayyah Bus Stop (Start)", lat: 3.2592484, lng: 101.7343945, maps: "https://maps.google.com/?q=3.2592484,101.7343945" },
+      { id: "asiah_leave", name: "Mahallah Asiah (Leave)", lat: 3.2573729, lng: 101.7335386, maps: "https://maps.google.com/?q=3.2573729,101.7335386" },
+      { id: "asma_leave", name: "Mahallah Asma (Leave)", lat: 3.2556487, lng: 101.7331782, maps: "https://maps.google.com/?q=3.2556487,101.7331782" },
       { id: "koed", name: "KOED", lat: 3.2540671, lng: 101.7334601, maps: "https://maps.google.com/?q=3.2540671,101.7334601" },
       { id: "uiam_utara", name: "UIAM (Utara)", lat: 3.2540413, lng: 101.7342752, maps: "https://maps.google.com/?q=3.2540413,101.7342752" },
       { id: "celpad_irkhs", name: "CELPAD / IRKHS", lat: 3.2529524, lng: 101.7358952, maps: "https://maps.google.com/?q=3.2529524,101.7358952" },
@@ -133,8 +132,9 @@
       { id: "kaed", name: "KAED", lat: 3.2506859, lng: 101.7312782, maps: "https://maps.google.com/?q=3.2506859,101.7312782" },
       { id: "kict", name: "KICT", lat: 3.2543536, lng: 101.7288605, maps: "https://maps.google.com/?q=3.2543536,101.7288605" },
       { id: "koe", name: "KOE", lat: 3.2542398, lng: 101.7321465, maps: "https://maps.google.com/?q=3.2542398,101.7321465" },
-      { id: "asma_return", name: "Asma (Return)", lat: 3.2556537, lng: 101.7331765, maps: "https://maps.google.com/?q=3.2556537,101.7331765" },
-      { id: "asiah_return", name: "Asiah (Return)", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" }
+      { id: "asma_return", name: "Mahallah Asma (Return)", lat: 3.2557963, lng: 101.7331349, maps: "https://maps.google.com/?q=3.2557963,101.7331349" },
+      { id: "asiah_return", name: "Mahallah Asiah (Return)", lat: 3.2581428, lng: 101.7336412, maps: "https://maps.google.com/?q=3.2581428,101.7336412" },
+      { id: "ruqayyah_return", name: "Ruqayyah Bus Stop (Return)", lat: 3.2591390, lng: 101.7341592, maps: "https://maps.google.com/?q=3.2591390,101.7341592" }
     ];
 
     const STOP_DWELL_TIME_MINS = 1;
@@ -146,7 +146,7 @@
     let nodeDistancesRoad = [];
 
     async function initRoadGeometries() {
-      const coordString = routeLoop.map(s => `${s.lng},${s.lat}`).join(';') + `;${routeLoop[0].lng},${routeLoop[0].lat}`;
+      const coordString = routeLoop.map(s => `${s.lng},${s.lat}`).join(';');
       const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson&steps=true`;
 
       try {
@@ -171,7 +171,6 @@
         }
       } catch (err) {
         const fallbackCoords = routeLoop.map(s => [s.lat, s.lng]);
-        fallbackCoords.push([routeLoop[0].lat, routeLoop[0].lng]);
         L.polyline(fallbackCoords, { color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
       }
     }
@@ -221,15 +220,10 @@
       const currentBusIdx = getClosestNodeIndex(bus.lat, bus.lng);
       const distToRuqayyah = getDistanceInMeters(bus.lat, bus.lng, routeLoop[0].lat, routeLoop[0].lng);
 
-      // RULE 1: ROUTE ORIGIN LOCK
-      // If the bus is positioned at a mid-route node but hasn't reached Ruqayyah (index 0) yet (e.g. > 150m from Ruqayyah),
-      // treat it as inactive/in-transit to start.
       if (currentBusIdx > 0 && distToRuqayyah > 150 && !bus.hasStartedFromRuqayyah) {
         return null; 
       }
 
-      // RULE 2: SINGLE PASS LOOP
-      // Bus cannot service stops behind its active position in a 1-pass cycle
       if (targetStopIdx < currentBusIdx) {
         return null;
       }
@@ -318,7 +312,6 @@
         const bus = doc.data();
         if (!bus.lat || !bus.lng) return;
 
-        // Auto-mark if bus has touched/passed Ruqayyah start point (within 150m)
         const distToRuqayyah = getDistanceInMeters(bus.lat, bus.lng, routeLoop[0].lat, routeLoop[0].lng);
         bus.hasStartedFromRuqayyah = (distToRuqayyah <= 150) || bus.hasStartedFromRuqayyah;
 
