@@ -118,47 +118,37 @@
     const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
     const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    const busStops = [
-      // Kulliyyahs
-      { id: "aikol", name: "AIKOL (Law)", lat: 3.251278, lng: 101.735611, maps: "https://maps.google.com/?q=3.251278,101.735611" },
-      { id: "kenms", name: "KENMS (Economics)", lat: 3.250528, lng: 101.734944, maps: "https://maps.google.com/?q=3.250528,101.734944" },
-      { id: "kirkhs", name: "KIRKHS (Islamic Knowledge)", lat: 3.251972, lng: 101.736417, maps: "https://maps.google.com/?q=3.251972,101.736417" },
-      { id: "kaed", name: "KAED (Architecture)", lat: 3.253028, lng: 101.737389, maps: "https://maps.google.com/?q=3.253028,101.737389" },
-      { id: "koe", name: "KOE (Engineering Bus Stop #4)", lat: 3.253639, lng: 101.739278, maps: "https://maps.google.com/?q=3.253639,101.739278" },
-      { id: "kict", name: "KICT (ICT Stop)", lat: 3.254111, lng: 101.737639, maps: "https://maps.google.com/?q=3.254111,101.737639" },
-      { id: "koed", name: "KOED (Education / CAC)", lat: 3.251806, lng: 101.739778, maps: "https://maps.google.com/?q=3.251806,101.739778" },
-      
-      // Male Mahallahs
-      { id: "m_faruq", name: "Mahallah Al-Faruq", lat: 3.255306, lng: 101.731556, maps: "https://maps.google.com/?q=3.255306,101.731556" },
-      { id: "m_siddiq", name: "Mahallah As-Siddiq", lat: 3.256833, lng: 101.731722, maps: "https://maps.google.com/?q=3.256833,101.731722" },
-      { id: "m_ali", name: "Mahallah Ali Ibn Abi Talib", lat: 3.254000, lng: 101.733556, maps: "https://maps.google.com/?q=3.254000,101.733556" },
-      { id: "m_bilal", name: "Mahallah Bilal Ibn Rabah", lat: 3.256139, lng: 101.735139, maps: "https://maps.google.com/?q=3.256139,101.735139" },
-      { id: "m_uthman", name: "Mahallah Uthman Ibn Affan", lat: 3.257028, lng: 101.733750, maps: "https://maps.google.com/?q=3.257028,101.733750" },
-      { id: "m_zubair", name: "Mahallah Zubair Al-Awwam", lat: 3.254806, lng: 101.733972, maps: "https://maps.google.com/?q=3.254806,101.733972" },
-
-      // Female Mahallahs
-      { id: "f_aminah", name: "Mahallah Aminah", lat: 3.249500, lng: 101.736972, maps: "https://maps.google.com/?q=3.249500,101.736972" },
-      { id: "f_asiah", name: "Mahallah Asiah", lat: 3.250889, lng: 101.742528, maps: "https://maps.google.com/?q=3.250889,101.742528" },
-      { id: "f_asma", name: "Mahallah Asma", lat: 3.251333, lng: 101.743694, maps: "https://maps.google.com/?q=3.251333,101.743694" },
-      { id: "f_hafsah", name: "Mahallah Hafsah", lat: 3.248722, lng: 101.739306, maps: "https://maps.google.com/?q=3.248722,101.739306" },
-      { id: "f_halimah", name: "Mahallah Halimah", lat: 3.248972, lng: 101.737944, maps: "https://maps.google.com/?q=3.248972,101.737944" },
-      { id: "f_maryam", name: "Mahallah Maryam", lat: 3.250778, lng: 101.740750, maps: "https://maps.google.com/?q=3.250778,101.740750" },
-      { id: "f_nusaibah", name: "Mahallah Nusaibah", lat: 3.247889, lng: 101.740306, maps: "https://maps.google.com/?q=3.247889,101.740306" },
-      { id: "f_ruqayyah", name: "Mahallah Ruqayyah", lat: 3.252278, lng: 101.742000, maps: "https://maps.google.com/?q=3.252278,101.742000" },
-      { id: "f_safiyyah", name: "Mahallah Safiyyah", lat: 3.246417, lng: 101.737861, maps: "https://maps.google.com/?q=3.246417,101.737861" },
-      { id: "f_salahuddin", name: "Mahallah Salahuddin", lat: 3.253083, lng: 101.741083, maps: "https://maps.google.com/?q=3.253083,101.741083" },
-      { id: "f_sumayyah", name: "Mahallah Sumayyah", lat: 3.252361, lng: 101.734222, maps: "https://maps.google.com/?q=3.252361,101.734222" }
+    // Strict Sequential Drivable Campus Route Loop Nodes
+    const routeLoop = [
+      { id: "ruqayyah", name: "Ruqayyah Bus Stop", lat: 3.25055, lng: 101.73719, maps: "https://maps.google.com/?q=3.25055,101.73719" },
+      { id: "sl158", name: "SL158 Kulliyyah of Education UIAM", lat: 3.25367, lng: 101.73356, maps: "https://maps.google.com/?q=3.25367,101.73356" },
+      { id: "sl159", name: "SL159 UIAM (Utara)", lat: 3.25595, lng: 101.73177, maps: "https://maps.google.com/?q=3.25595,101.73177" },
+      { id: "sl161", name: "SL161 Perpustakaan UIAM / CELPAD", lat: 3.25244, lng: 101.72793, maps: "https://maps.google.com/?q=3.25244,101.72793" },
+      { id: "sl162", name: "SL162 Hub UIA", lat: 3.25141, lng: 101.72624, maps: "https://maps.google.com/?q=3.25141,101.72624" },
+      { id: "sl152", name: "SL152 UIAM (Timur)", lat: 3.24921, lng: 101.73030, maps: "https://maps.google.com/?q=3.24921,101.73030" },
+      { id: "sl153", name: "SL153 (KENMS)", lat: 3.25043, lng: 101.73099, maps: "https://maps.google.com/?q=3.25043,101.73099" },
+      { id: "sl154", name: "SL154 Mahallah Safiyyah", lat: 3.25076, lng: 101.73295, maps: "https://maps.google.com/?q=3.25076,101.73295" },
+      { id: "sl155", name: "SL155 UIAM (Selatan)", lat: 3.24976, lng: 101.73489, maps: "https://maps.google.com/?q=3.24976,101.73489" },
+      { id: "sl156", name: "SL156 KAED UIAM", lat: 3.25144, lng: 101.73587, maps: "https://maps.google.com/?q=3.25144,101.73587" },
+      { id: "sl157", name: "SL157 Kulliyyah of Engineering UIAM", lat: 3.25304, lng: 101.73714, maps: "https://maps.google.com/?q=3.25304,101.73714" }
     ];
 
-    const map = L.map('map', { zoomControl: false }).setView([3.2520, 101.7370], 15);
+    const STOP_DWELL_TIME_MINS = 1; // 1-minute pickup/dropoff buffer per station along the route
+
+    const map = L.map('map', { zoomControl: false }).setView([3.2520, 101.7330], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Draw Route Loop Line on Map
+    const loopCoords = routeLoop.map(stop => [stop.lat, stop.lng]);
+    loopCoords.push([routeLoop[0].lat, routeLoop[0].lng]); // Connect back to Ruqayyah
+    L.polyline(loopCoords, { color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
 
     const stopMarkers = {};
     const activeBuses = {};
     let userMarker = null;
 
-    busStops.forEach(stop => {
+    routeLoop.forEach(stop => {
       const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon }).addTo(map);
       marker.bindPopup(`
         <div style="font-size:13px;">
@@ -180,6 +170,50 @@
       return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
+    // Find closest node on the route loop for a bus
+    function getClosestNodeIndex(lat, lng) {
+      let minDistance = Infinity;
+      let closestIdx = 0;
+      routeLoop.forEach((stop, idx) => {
+        const dist = getDistanceInMeters(lat, lng, stop.lat, stop.lng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIdx = idx;
+        }
+      });
+      return closestIdx;
+    }
+
+    // Calculate sequential route distance and ETA through loop nodes + dwell delay
+    function calculateRouteEta(bus, targetStopIdx) {
+      const currentBusIdx = getClosestNodeIndex(bus.lat, bus.lng);
+      
+      let totalDistanceMeters = 0;
+      let stationCount = 0;
+      let idx = currentBusIdx;
+
+      // Distance from live bus location to its immediate next node
+      totalDistanceMeters += getDistanceInMeters(bus.lat, bus.lng, routeLoop[idx].lat, routeLoop[idx].lng);
+
+      // Traversal step-by-step along the strict route loop order
+      while (idx !== targetStopIdx) {
+        const nextIdx = (idx + 1) % routeLoop.length;
+        totalDistanceMeters += getDistanceInMeters(routeLoop[idx].lat, routeLoop[idx].lng, routeLoop[nextIdx].lat, routeLoop[nextIdx].lng);
+        stationCount++;
+        idx = nextIdx;
+      }
+
+      const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18; // Default 18 km/h speed
+      const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
+      const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS; // Pickup/dropoff delay for each station passed
+
+      return {
+        eta: Math.round(travelTimeMinutes + dwellDelayMinutes),
+        distanceMeters: Math.round(totalDistanceMeters),
+        intermediateStops: stationCount
+      };
+    }
+
     function locateUser() {
       if (!("geolocation" in navigator)) {
         alert("Location access unavailable.");
@@ -199,7 +233,7 @@
         let nearest = null;
         let minDist = Infinity;
 
-        busStops.forEach(stop => {
+        routeLoop.forEach(stop => {
           const dist = getDistanceInMeters(uLat, uLng, stop.lat, stop.lng);
           if (dist < minDist) {
             minDist = dist;
@@ -253,7 +287,6 @@
         }
       });
 
-      // Remove map markers for buses that went offline/deleted from database
       Object.keys(activeBuses).forEach(busName => {
         if (!currentBusNamesInDb.has(busName)) {
           map.removeLayer(activeBuses[busName]);
@@ -265,30 +298,29 @@
         ? `Active Fleet: ${activeList.join(", ")}` 
         : "No Active Buses Broadcasting";
 
-      // Reset or update stop popups
-      busStops.forEach(stop => {
+      // Sequential Route ETA calculations per station
+      routeLoop.forEach((stop, targetIdx) => {
         let minEta = Infinity;
         let selectedBus = null;
+        let bestRouteDetails = null;
 
         busDataArray.forEach(bus => {
-          const distMeters = getDistanceInMeters(bus.lat, bus.lng, stop.lat, stop.lng);
-          const distKm = distMeters / 1000;
-          const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18;
-          const eta = Math.round((distKm / effectiveSpeed) * 60);
-
-          if (eta < minEta) {
-            minEta = eta;
+          const routeDetails = calculateRouteEta(bus, targetIdx);
+          if (routeDetails.eta < minEta) {
+            minEta = routeDetails.eta;
             selectedBus = bus;
+            bestRouteDetails = routeDetails;
           }
         });
 
         const marker = stopMarkers[stop.id];
-        if (selectedBus) {
+        if (selectedBus && bestRouteDetails) {
           marker.setPopupContent(`
             <div style="font-size:13px;">
               <b>${stop.name}</b><br/>
               Next Bus: <b>${selectedBus.name}</b><br/>
-              ETA: <b>${minEta} mins</b> (${Math.round(getDistanceInMeters(selectedBus.lat, selectedBus.lng, stop.lat, stop.lng))}m away)<br/>
+              ETA: <b>${minEta} mins</b> (${bestRouteDetails.distanceMeters}m along route)<br/>
+              Stops Remaining: <b>${bestRouteDetails.intermediateStops}</b> (includes pickup delays)<br/>
               Bus Speed: <b>${selectedBus.speedKmH || 0} km/h</b><br/>
               Occupancy: <b>${selectedBus.occupancy || 'Normal'}</b><br/>
               <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
