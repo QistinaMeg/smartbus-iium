@@ -45,14 +45,14 @@
       z-index: 1000;
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(8px);
-      padding: 10px 18px;
+      padding: 12px 24px;
       border-radius: 30px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
       display: flex;
       align-items: center;
       gap: 12px;
-      width: 92%;
-      max-width: 420px;
+      width: 90%;
+      max-width: 450px;
       justify-content: space-between;
     }
 
@@ -63,7 +63,7 @@
     }
 
     .brand h1 {
-      font-size: 1.05rem;
+      font-size: 1.1rem;
       color: #1e293b;
       font-weight: 700;
     }
@@ -79,122 +79,92 @@
 
     .control-panel {
       position: absolute;
-      bottom: 15px;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
       background: #ffffff;
-      width: 92%;
-      max-width: 420px;
-      padding: 14px;
-      border-radius: 18px;
+      width: 90%;
+      max-width: 450px;
+      padding: 20px;
+      border-radius: 20px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-
-    .btn-location {
-      width: 100%;
-      padding: 10px;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      cursor: pointer;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .btn-location:hover {
-      background: #1d4ed8;
     }
 
     .filter-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 15px;
     }
 
     .filter-group label {
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 600;
       color: #64748b;
     }
 
     select {
       width: 100%;
-      padding: 8px 10px;
+      padding: 12px;
       border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
       color: #1e293b;
       outline: none;
       background-color: #f8fafc;
+      cursor: pointer;
     }
 
-    .section-title {
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #334155;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    select:focus {
+      border-color: #2563eb;
     }
 
-    .bus-list, .station-list {
-      max-height: 100px;
+    .bus-list {
+      max-height: 150px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-bottom: 10px;
+      gap: 8px;
     }
 
-    .card-item {
+    .bus-card {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 10px;
+      padding: 10px 14px;
       background: #f1f5f9;
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.2s;
     }
 
-    .card-item:hover {
+    .bus-card:hover {
       background: #e2e8f0;
     }
 
-    .card-info .card-title {
+    .bus-info .bus-title {
       font-weight: 600;
       color: #0f172a;
-      font-size: 0.82rem;
+      font-size: 0.9rem;
     }
 
-    .card-info .card-sub {
-      font-size: 0.72rem;
+    .bus-info .bus-sub {
+      font-size: 0.75rem;
       color: #64748b;
     }
 
-    .eta-badge {
-      font-size: 0.78rem;
+    .bus-speed {
+      font-size: 0.85rem;
       font-weight: 700;
-      color: #2563eb;
-      background: #eff6ff;
-      padding: 4px 8px;
-      border-radius: 6px;
-      border: 1px solid #bfdbfe;
+      color: #16a34a;
     }
 
     .empty-state {
       text-align: center;
       color: #94a3b8;
-      font-size: 0.78rem;
-      padding: 6px 0;
+      font-size: 0.85rem;
+      padding: 10px 0;
     }
 
     .bus-marker-icon {
@@ -207,20 +177,14 @@
       justify-content: center;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
     }
-
-    .user-marker-icon {
-      background: #16a34a;
-      border: 2px solid #ffffff;
-      border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
   </style>
 </head>
 <body>
 
+  <!-- Top Banner Overlay -->
   <div class="header-overlay">
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="6" width="18" height="12" rx="2" />
         <circle cx="7" cy="18" r="2" />
         <circle cx="17" cy="18" r="2" />
@@ -231,16 +195,11 @@
     <div class="status-badge" id="active-count">0 Active Buses</div>
   </div>
 
+  <!-- Interactive Map View -->
   <div id="map"></div>
 
+  <!-- Route Filter & Active Bus Panel -->
   <div class="control-panel">
-    <button class="btn-location" onclick="checkMyLocation()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-      </svg>
-      Check My Location
-    </button>
-
     <div class="filter-group">
       <label for="route-select">Filter Route / Terminal:</label>
       <select id="route-select">
@@ -250,15 +209,12 @@
       </select>
     </div>
 
-    <div class="section-title">Active Buses</div>
     <div class="bus-list" id="bus-list-container">
       <div class="empty-state">Loading live bus updates...</div>
     </div>
-
-    <div class="section-title">Ruqayyah Loop Stations & ETA</div>
-    <div class="station-list" id="station-list-container"></div>
   </div>
 
+  <!-- Leaflet JS -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -266,23 +222,26 @@
   ></script>
 
   <script>
+    // -----------------------------------------------------------------
+    // 1. Firebase Configuration
+    // -----------------------------------------------------------------
     const firebaseConfig = {
-      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
-      authDomain: "smartbus-iium.firebaseapp.com",
-      projectId: "smartbus-iium",
-      storageBucket: "smartbus-iium.firebasestorage.app",
-      messagingSenderId: "920517840888",
-      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
-      measurementId: "G-EDHGR3H4X3"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    // -----------------------------------------------------------------
+    // 2. Leaflet Map Centered at IIUM Gombak
+    // -----------------------------------------------------------------
     const IIUM_GOMBAK_COORDS = [3.2520, 101.7345];
-    const map = L.map('map', { zoomControl: false }).setView(IIUM_GOMBAK_COORDS, 16);
+    const map = L.map('map', { zoomControl: false }).setView(IIUM_GOMBAK_COORDS, 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
@@ -291,136 +250,8 @@
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // --- MAHALLAH RUQAYYAH ROUTE STATIONS & PATH ---
-    const RUQAYYAH_STATIONS = [
-      { id: "start", name: "Mahallah Ruqayyah (START)", lat: 3.2520, lng: 101.7335, type: "terminal" },
-      { id: "kaed", name: "KAED Bus Stop", lat: 3.2535, lng: 101.7348, type: "stop" },
-      { id: "kict", name: "KICT Bus Stop", lat: 3.2550, lng: 101.7360, type: "stop" },
-      { id: "celpad", name: "CELPAD / Admin Stop", lat: 3.2512, lng: 101.7372, type: "stop" },
-      { id: "maryam", name: "Mahallah Maryam Stop", lat: 3.2492, lng: 101.7350, type: "stop" },
-      { id: "end", name: "Mahallah Ruqayyah (END)", lat: 3.2518, lng: 101.7333, type: "terminal" }
-    ];
-
-    // High-visibility Blue Polyline Route
-    const routeCoords = RUQAYYAH_STATIONS.map(s => [s.lat, s.lng]);
-    const routeLine = L.polyline(routeCoords, {
-      color: '#2563eb',
-      weight: 6,
-      opacity: 0.85,
-      lineCap: 'round'
-    }).addTo(map);
-
-    // Station Markers Map Storage
-    const stationMarkers = {};
-
-    RUQAYYAH_STATIONS.forEach(station => {
-      const isTerminal = station.type === "terminal";
-      const marker = L.circleMarker([station.lat, station.lng], {
-        radius: isTerminal ? 9 : 6,
-        fillColor: isTerminal ? '#dc2626' : '#2563eb',
-        color: '#ffffff',
-        weight: 3,
-        fillOpacity: 1
-      }).addTo(map);
-
-      marker.bindPopup(`
-        <div style="text-align:center;">
-          <strong style="font-size:0.9rem;">${station.name}</strong><br>
-          <span id="popup-eta-${station.id}" style="color:#2563eb; font-weight:bold; font-size:0.85rem;">Calculating ETA...</span>
-        </div>
-      `);
-
-      marker.on("click", () => updatePopupETA(station));
-      stationMarkers[station.id] = marker;
-    });
-
-    // --- LOCATION TRACKER ---
-    let userMarker = null;
-    let userCircle = null;
-
-    function checkMyLocation() {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const { latitude, longitude, accuracy } = pos.coords;
-
-            if (userMarker) map.removeLayer(userMarker);
-            if (userCircle) map.removeLayer(userCircle);
-
-            const userIcon = L.divIcon({
-              className: 'custom-user-marker',
-              html: `<div class="user-marker-icon" style="width:18px; height:18px;"></div>`,
-              iconSize: [18, 18],
-              iconAnchor: [9, 9]
-            });
-
-            userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map)
-              .bindPopup("<b>Your Current Location</b>").openPopup();
-
-            userCircle = L.circle([latitude, longitude], {
-              radius: accuracy,
-              color: '#16a34a',
-              fillColor: '#16a34a',
-              fillOpacity: 0.15
-            }).addTo(map);
-
-            map.flyTo([latitude, longitude], 17, { duration: 1.5 });
-          },
-          (err) => alert("GPS Permission Denied: " + err.message),
-          { enableHighAccuracy: true }
-        );
-      } else {
-        alert("Geolocation is not supported by your browser.");
-      }
-    }
-
-    // --- HAVERSINE ETA CALCULATOR ---
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-    }
-
-    function calculateETA(distanceKm, speedKmH) {
-      const effectiveSpeed = speedKmH > 5 ? speedKmH : 18;
-      const minutes = Math.round((distanceKm / effectiveSpeed) * 60);
-      return minutes < 1 ? "< 1 min" : `${minutes} mins`;
-    }
-
-    function getStationETA(station) {
-      const activeRuqayyahBuses = currentBusesData.filter(b => b.startTerminal === "Ruqayyah");
-      if (activeRuqayyahBuses.length === 0) return "No active bus";
-
-      let minDistance = Infinity;
-      let closestBus = null;
-
-      activeRuqayyahBuses.forEach((bus) => {
-        const dist = calculateDistance(bus.lat, bus.lng, station.lat, station.lng);
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestBus = bus;
-        }
-      });
-
-      return closestBus ? calculateETA(minDistance, closestBus.speedKmH || 0) : "No active bus";
-    }
-
-    function updatePopupETA(station) {
-      const eta = getStationETA(station);
-      setTimeout(() => {
-        const popupEl = document.getElementById(`popup-eta-${station.id}`);
-        if (popupEl) popupEl.innerText = `Next Bus ETA: ${eta}`;
-      }, 100);
-    }
-
-    // --- FIREBASE REALTIME SYNC ---
     const busMarkers = {};
     let currentBusesData = [];
-    const STALE_TIMEOUT_MS = 60000;
 
     function createBusIcon() {
       return L.divIcon({
@@ -440,23 +271,22 @@
       });
     }
 
+    // -----------------------------------------------------------------
+    // 3. Real-time Listener
+    // -----------------------------------------------------------------
     db.collection("buses").onSnapshot((snapshot) => {
       currentBusesData = [];
       const updatedDocIds = new Set();
-      const now = Date.now();
 
       snapshot.forEach((doc) => {
         const data = doc.data();
         const docId = doc.id;
-
-        const lastUpdatedMs = data.lastUpdated && data.lastUpdated.toMillis ? data.lastUpdated.toMillis() : now;
-        if (now - lastUpdatedMs > STALE_TIMEOUT_MS) return;
-
+        
         currentBusesData.push({ id: docId, ...data });
         updatedDocIds.add(docId);
 
         const lat = data.lat || 3.2520;
-        const lng = data.lng || 101.7335;
+        const lng = data.lng || 101.7345;
         const busName = data.name || "IIUM Shuttle";
         const speed = data.speedKmH !== undefined ? data.speedKmH : 0;
         const terminal = data.startTerminal || "Ruqayyah";
@@ -479,6 +309,7 @@
         }
       });
 
+      // Cleanup inactive bus markers from map
       Object.keys(busMarkers).forEach((docId) => {
         if (!updatedDocIds.has(docId)) {
           map.removeLayer(busMarkers[docId]);
@@ -487,79 +318,58 @@
       });
 
       renderBusList();
-      renderStationList();
+    }, (error) => {
+      console.error("Firestore Listener Error: ", error);
     });
 
+    // -----------------------------------------------------------------
+    // 4. UI Filtering
+    // -----------------------------------------------------------------
     const routeSelect = document.getElementById("route-select");
     const busListContainer = document.getElementById("bus-list-container");
-    const stationListContainer = document.getElementById("station-list-container");
     const activeCountBadge = document.getElementById("active-count");
 
-    routeSelect.addEventListener("change", () => {
-      renderBusList();
-      renderStationList();
-    });
+    routeSelect.addEventListener("change", renderBusList);
 
     function renderBusList() {
       const selectedFilter = routeSelect.value;
-      const filteredBuses = currentBusesData.filter(b => selectedFilter === "ALL" || b.startTerminal === selectedFilter);
+      
+      const filteredBuses = currentBusesData.filter((bus) => {
+        if (selectedFilter === "ALL") return true;
+        return bus.startTerminal === selectedFilter;
+      });
 
       activeCountBadge.innerText = `${filteredBuses.length} Active Bus${filteredBuses.length === 1 ? '' : 'es'}`;
       busListContainer.innerHTML = "";
 
       if (filteredBuses.length === 0) {
-        busListContainer.innerHTML = `<div class="empty-state">No active buses on this route.</div>`;
+        busListContainer.innerHTML = `<div class="empty-state">No active buses on this route currently.</div>`;
         return;
       }
 
       filteredBuses.forEach((bus) => {
         const card = document.createElement("div");
-        card.className = "card-item";
+        card.className = "bus-card";
         card.innerHTML = `
-          <div class="card-info">
-            <div class="card-title">${bus.name || "IIUM Shuttle"}</div>
-            <div class="card-sub">Terminal: ${bus.startTerminal || "Ruqayyah"}</div>
+          <div class="bus-info">
+            <div class="bus-title">${bus.name || "IIUM Shuttle"}</div>
+            <div class="bus-sub">Terminal: ${bus.startTerminal || "Ruqayyah"}</div>
           </div>
-          <div class="eta-badge">${bus.speedKmH || 0} km/h</div>
+          <div class="bus-speed">${bus.speedKmH || 0} km/h</div>
         `;
+
         card.addEventListener("click", () => {
           if (bus.lat && bus.lng) {
             map.flyTo([bus.lat, bus.lng], 17, { duration: 1.2 });
-            if (busMarkers[bus.id]) busMarkers[bus.id].openPopup();
+            if (busMarkers[bus.id]) {
+              busMarkers[bus.id].openPopup();
+            }
           }
         });
+
         busListContainer.appendChild(card);
       });
     }
-
-    function renderStationList() {
-      stationListContainer.innerHTML = "";
-
-      RUQAYYAH_STATIONS.forEach((station) => {
-        const etaText = getStationETA(station);
-        const card = document.createElement("div");
-        card.className = "card-item";
-        card.innerHTML = `
-          <div class="card-info">
-            <div class="card-title">${station.name}</div>
-            <div class="card-sub">Ruqayyah Loop</div>
-          </div>
-          <div class="eta-badge">${etaText}</div>
-        `;
-
-        card.addEventListener("click", () => {
-          map.flyTo([station.lat, station.lng], 17, { duration: 1.2 });
-          if (stationMarkers[station.id]) {
-            stationMarkers[station.id].openPopup();
-            updatePopupETA(station);
-          }
-        });
-
-        stationListContainer.appendChild(card);
-      });
-    }
-
-    renderStationList();
   </script>
 </body>
 </html>
