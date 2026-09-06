@@ -118,7 +118,6 @@
     const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
     const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    // ROUTE 1: RUQAYYAH BUS Sequential Coordinates Order
     const routeLoop = [
       { id: "ruqayyah_1", name: "Ruqayyah Bus Stop", lat: 3.2592431, lng: 101.7344153, maps: "https://maps.google.com/?q=3.2592431,101.7344153" },
       { id: "asiah_1", name: "Asiah", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" },
@@ -138,44 +137,47 @@
     ];
 
     const STOP_DWELL_TIME_MINS = 1;
-
     const map = L.map('map', { zoomControl: false }).setView([3.2535, 101.7340], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let routePolyline = null;
+    let nodeDistancesRoad = [];
 
-    // Fetch actual real-life road geometry from OSRM Routing Engine
-    function drawRealRoadRoute() {
-      // OSRM expects coordinates formatted as: lng,lat;lng,lat...
+    // Pre-calculate exact OSRM road distance between sequential nodes
+    async function initRoadGeometries() {
       const coordString = routeLoop.map(s => `${s.lng},${s.lat}`).join(';') + `;${routeLoop[0].lng},${routeLoop[0].lat}`;
-      const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson&steps=true`;
 
-      fetch(url)
-        .then(res => res.json())
-        .then(data => {
-          if (data.routes && data.routes.length > 0) {
-            // Extract the true road path coordinates (lat, lng)
-            const roadCoords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-            
-            if (routePolyline) map.removeLayer(routePolyline);
-            routePolyline = L.polyline(roadCoords, {
-              color: '#2563eb',
-              weight: 5,
-              opacity: 0.8,
-              lineJoin: 'round'
-            }).addTo(map);
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const roadCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          
+          if (routePolyline) map.removeLayer(routePolyline);
+          routePolyline = L.polyline(roadCoords, {
+            color: '#2563eb',
+            weight: 5,
+            opacity: 0.8,
+            lineJoin: 'round'
+          }).addTo(map);
+
+          // Store OSRM leg distances between consecutive stops
+          if (route.legs) {
+            nodeDistancesRoad = route.legs.map(leg => leg.distance); // distance in meters
           }
-        })
-        .catch(() => {
-          // Fallback straight lines if routing server is slow
-          const fallbackCoords = routeLoop.map(s => [s.lat, s.lng]);
-          fallbackCoords.push([routeLoop[0].lat, routeLoop[0].lng]);
-          L.polyline(fallbackCoords, { color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
-        });
+        }
+      } catch (err) {
+        const fallbackCoords = routeLoop.map(s => [s.lat, s.lng]);
+        fallbackCoords.push([routeLoop[0].lat, routeLoop[0].lng]);
+        L.polyline(fallbackCoords, { color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
+      }
     }
 
-    drawRealRoadRoute();
+    initRoadGeometries();
 
     const stopMarkers = {};
     const activeBuses = {};
@@ -216,6 +218,7 @@
       return closestIdx;
     }
 
+    // Precise road network calculation for ETA
     function calculateRouteEta(bus, targetStopIdx) {
       const currentBusIdx = getClosestNodeIndex(bus.lat, bus.lng);
       
@@ -223,23 +226,32 @@
       let stationCount = 0;
       let idx = currentBusIdx;
 
+      // Distance from live bus coordinates to its upcoming node
       totalDistanceMeters += getDistanceInMeters(bus.lat, bus.lng, routeLoop[idx].lat, routeLoop[idx].lng);
 
+      // Traversal using pre-calculated OSRM road distances between nodes
       while (idx !== targetStopIdx) {
-        const nextIdx = (idx + 1) % routeLoop.length;
-        totalDistanceMeters += getDistanceInMeters(routeLoop[idx].lat, routeLoop[idx].lng, routeLoop[nextIdx].lat, routeLoop[nextIdx].lng);
+        const legDist = (nodeDistancesRoad.length > idx) 
+          ? nodeDistancesRoad[idx] 
+          : getDistanceInMeters(routeLoop[idx].lat, routeLoop[idx].lng, routeLoop[(idx + 1) % routeLoop.length].lat, routeLoop[(idx + 1) % routeLoop.length].lng);
+        
+        totalDistanceMeters += legDist;
         stationCount++;
-        idx = nextIdx;
+        idx = (idx + 1) % routeLoop.length;
       }
 
-      const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18;
+      // Constantly use bus speed broadcast live from GPS; fallback to 18 km/h baseline if idling/stopped
+      const currentLiveSpeed = bus.speedKmH;
+      const effectiveSpeed = (currentLiveSpeed && currentLiveSpeed > 5) ? currentLiveSpeed : 18;
+      
       const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
       const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS;
 
       return {
-        eta: Math.round(travelTimeMinutes + dwellDelayMinutes),
+        eta: Math.max(1, Math.round(travelTimeMinutes + dwellDelayMinutes)),
         distanceMeters: Math.round(totalDistanceMeters),
-        intermediateStops: stationCount
+        intermediateStops: stationCount,
+        liveSpeedUsed: effectiveSpeed
       };
     }
 
@@ -305,7 +317,7 @@
 
         const popupText = `
           <b>Bus ${bus.name}</b><br/>
-          Speed: <b>${bus.speedKmH || 0} km/h</b><br/>
+          Live Speed: <b>${bus.speedKmH || 0} km/h</b><br/>
           Occupancy: <b>${bus.occupancy || 'Unknown'}</b>
         `;
 
@@ -347,9 +359,9 @@
             <div style="font-size:13px;">
               <b>${stop.name}</b><br/>
               Next Bus: <b>${selectedBus.name}</b><br/>
-              ETA: <b>${minEta} mins</b> (${bestRouteDetails.distanceMeters}m along route)<br/>
-              Stops Remaining: <b>${bestRouteDetails.intermediateStops}</b> (includes pickup delays)<br/>
-              Bus Speed: <b>${selectedBus.speedKmH || 0} km/h</b><br/>
+              ETA: <b>${minEta} mins</b> (${bestRouteDetails.distanceMeters}m via road)<br/>
+              Stops Remaining: <b>${bestRouteDetails.intermediateStops}</b><br/>
+              Calc. Speed: <b>${bestRouteDetails.liveSpeedUsed} km/h</b><br/>
               Occupancy: <b>${selectedBus.occupancy || 'Normal'}</b><br/>
               <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
             </div>
