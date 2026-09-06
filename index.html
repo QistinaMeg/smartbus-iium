@@ -2,52 +2,71 @@
 <html lang="en">
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>IIUM Live Bus Tracker</title>
+  <title>SmartBus IIUM Real-Time Tracker</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: sans-serif; }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     #map { width: 100vw; height: 100vh; z-index: 1; }
     
     .status-card {
       position: absolute;
-      top: 15px;
+      top: 12px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
       background: rgba(255, 255, 255, 0.95);
-      padding: 10px 18px;
-      border-radius: 25px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      font-size: 13px;
       font-weight: 600;
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
+    .pitch-banner {
+      position: absolute;
+      top: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      max-width: 90%;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
     .user-btn {
       position: absolute;
-      bottom: 30px;
-      left: 20px;
+      bottom: 24px;
+      left: 16px;
       z-index: 1000;
-      background: white;
+      background: #2563eb;
+      color: white;
       border: none;
-      border-radius: 50px;
-      padding: 12px 18px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      font-weight: bold;
+      border-radius: 30px;
+      padding: 10px 16px;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+      font-weight: 600;
       cursor: pointer;
+      font-size: 13px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 14px;
+      gap: 6px;
     }
 
     .live-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       background-color: #22c55e;
       border-radius: 50%;
       animation: pulse 1.5s infinite;
@@ -55,19 +74,20 @@
 
     .info-btn {
       display: inline-block;
-      margin-top: 8px;
-      background: #2563eb;
-      color: white;
+      margin-top: 6px;
+      background: #f1f5f9;
+      color: #0f172a;
       text-decoration: none;
-      padding: 6px 12px;
-      border-radius: 15px;
-      font-size: 12px;
-      font-weight: bold;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #cbd5e1;
     }
 
     @keyframes pulse {
       0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
       100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
   </style>
@@ -76,11 +96,15 @@
 
   <div class="status-card">
     <div class="live-dot"></div>
-    <span id="status-text">Waiting for Bus Signal...</span>
+    <span id="status-text">Connecting Fleet Data...</span>
+  </div>
+
+  <div class="pitch-banner">
+    📢 <b>Campus Motion:</b> High route delays detected. Fleet expansion required for peak hours.
   </div>
 
   <button class="user-btn" onclick="locateUser()">
-    👤 Share Location / Nearest Stop
+    👤 Find Nearest Stop
   </button>
 
   <div id="map"></div>
@@ -90,32 +114,43 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // 1. CUSTOM SVG ICONS FOR BUS, STOP, AND PERSON
-    const busIcon = L.divIcon({
-      html: `<div style="font-size:26px;">🚌</div>`,
-      className: 'custom-icon', iconSize: [30, 30], iconAnchor: [15, 15]
-    });
+    const busIcon = L.divIcon({ html: `<div style="font-size:24px;">🚌</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
+    const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
+    const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    const stopIcon = L.divIcon({
-      html: `<div style="font-size:24px;">🚏</div>`,
-      className: 'custom-icon', iconSize: [25, 25], iconAnchor: [12, 12]
-    });
-
-    const personIcon = L.divIcon({
-      html: `<div style="font-size:26px;">🚶</div>`,
-      className: 'custom-icon', iconSize: [30, 30], iconAnchor: [15, 15]
-    });
-
-    // 2. IIUM BUS STOPS WITH GOOGLE MAPS STREETVIEW / MAP LINKS
     const busStops = [
-      { id: "kaed", name: "KAED (Architecture)", lat: 3.25044, lng: 101.73106, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25044,101.73106" },
-      { id: "koe", name: "KOE (Engineering)", lat: 3.25419, lng: 101.73169, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25419,101.73169" },
-      { id: "koed", name: "KOED (Education)", lat: 3.25406, lng: 101.73325, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25406,101.73325" },
-      { id: "irkhs", name: "IRKHS", lat: 3.25556, lng: 101.73519, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25556,101.73519" },
-      { id: "lib", name: "Perpustakaan UIAM", lat: 3.25194, lng: 101.73469, radius: 40, mapsUrl: "https://www.google.com/maps/search/?api=1&query=3.25194,101.73469" }
+      // Kulliyyahs
+      { id: "aikol", name: "AIKOL (Law)", lat: 3.251278, lng: 101.735611, maps: "https://maps.google.com/?q=3.251278,101.735611" },
+      { id: "kenms", name: "KENMS (Economics)", lat: 3.250528, lng: 101.734944, maps: "https://maps.google.com/?q=3.250528,101.734944" },
+      { id: "kirkhs", name: "KIRKHS (Islamic Knowledge)", lat: 3.251972, lng: 101.736417, maps: "https://maps.google.com/?q=3.251972,101.736417" },
+      { id: "kaed", name: "KAED (Architecture)", lat: 3.253028, lng: 101.737389, maps: "https://maps.google.com/?q=3.253028,101.737389" },
+      { id: "koe", name: "KOE (Engineering Bus Stop #4)", lat: 3.253639, lng: 101.739278, maps: "https://maps.google.com/?q=3.253639,101.739278" },
+      { id: "kict", name: "KICT (ICT Stop)", lat: 3.254111, lng: 101.737639, maps: "https://maps.google.com/?q=3.254111,101.737639" },
+      { id: "koed", name: "KOED (Education / CAC)", lat: 3.251806, lng: 101.739778, maps: "https://maps.google.com/?q=3.251806,101.739778" },
+      
+      // Male Mahallahs
+      { id: "m_faruq", name: "Mahallah Al-Faruq", lat: 3.255306, lng: 101.731556, maps: "https://maps.google.com/?q=3.255306,101.731556" },
+      { id: "m_siddiq", name: "Mahallah As-Siddiq", lat: 3.256833, lng: 101.731722, maps: "https://maps.google.com/?q=3.256833,101.731722" },
+      { id: "m_ali", name: "Mahallah Ali Ibn Abi Talib", lat: 3.254000, lng: 101.733556, maps: "https://maps.google.com/?q=3.254000,101.733556" },
+      { id: "m_bilal", name: "Mahallah Bilal Ibn Rabah", lat: 3.256139, lng: 101.735139, maps: "https://maps.google.com/?q=3.256139,101.735139" },
+      { id: "m_uthman", name: "Mahallah Uthman Ibn Affan", lat: 3.257028, lng: 101.733750, maps: "https://maps.google.com/?q=3.257028,101.733750" },
+      { id: "m_zubair", name: "Mahallah Zubair Al-Awwam", lat: 3.254806, lng: 101.733972, maps: "https://maps.google.com/?q=3.254806,101.733972" },
+
+      // Female Mahallahs
+      { id: "f_aminah", name: "Mahallah Aminah", lat: 3.249500, lng: 101.736972, maps: "https://maps.google.com/?q=3.249500,101.736972" },
+      { id: "f_asiah", name: "Mahallah Asiah", lat: 3.250889, lng: 101.742528, maps: "https://maps.google.com/?q=3.250889,101.742528" },
+      { id: "f_asma", name: "Mahallah Asma", lat: 3.251333, lng: 101.743694, maps: "https://maps.google.com/?q=3.251333,101.743694" },
+      { id: "f_hafsah", name: "Mahallah Hafsah", lat: 3.248722, lng: 101.739306, maps: "https://maps.google.com/?q=3.248722,101.739306" },
+      { id: "f_halimah", name: "Mahallah Halimah", lat: 3.248972, lng: 101.737944, maps: "https://maps.google.com/?q=3.248972,101.737944" },
+      { id: "f_maryam", name: "Mahallah Maryam", lat: 3.250778, lng: 101.740750, maps: "https://maps.google.com/?q=3.250778,101.740750" },
+      { id: "f_nusaibah", name: "Mahallah Nusaibah", lat: 3.247889, lng: 101.740306, maps: "https://maps.google.com/?q=3.247889,101.740306" },
+      { id: "f_ruqayyah", name: "Mahallah Ruqayyah", lat: 3.252278, lng: 101.742000, maps: "https://maps.google.com/?q=3.252278,101.742000" },
+      { id: "f_safiyyah", name: "Mahallah Safiyyah", lat: 3.246417, lng: 101.737861, maps: "https://maps.google.com/?q=3.246417,101.737861" },
+      { id: "f_salahuddin", name: "Mahallah Salahuddin", lat: 3.253083, lng: 101.741083, maps: "https://maps.google.com/?q=3.253083,101.741083" },
+      { id: "f_sumayyah", name: "Mahallah Sumayyah", lat: 3.252361, lng: 101.734222, maps: "https://maps.google.com/?q=3.252361,101.734222" }
     ];
 
-    const map = L.map('map', { zoomControl: false }).setView([3.2535, 101.7330], 16);
+    const map = L.map('map', { zoomControl: false }).setView([3.2520, 101.7370], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -123,25 +158,20 @@
     const activeBuses = {};
     let userMarker = null;
 
-    // Draw Stops
     busStops.forEach(stop => {
       const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon }).addTo(map);
-      
-      L.circle([stop.lat, stop.lng], {
-        color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.15, radius: stop.radius
-      }).addTo(map);
-
       marker.bindPopup(`
-        <b>${stop.name}</b><br/>
-        Estimated Arrival: <i>Waiting for active buses...</i><br/>
-        <a href="${stop.mapsUrl}" target="_blank" class="info-btn">ⓘ 360° / View Stop Photo</a>
+        <div style="font-size:13px;">
+          <b>${stop.name}</b><br/>
+          Status: <i>No active buses...</i><br/>
+          <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
+        </div>
       `);
-      
       stopMarkers[stop.id] = marker;
     });
 
     function getDistanceInMeters(lat1, lon1, lat2, lon2) {
-      const R = 6371000; 
+      const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -150,10 +180,9 @@
       return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    // 3. MANUAL LOCATION SHARING
     function locateUser() {
       if (!("geolocation" in navigator)) {
-        alert("Geolocation not supported by your browser.");
+        alert("Location access unavailable.");
         return;
       }
 
@@ -167,29 +196,25 @@
           userMarker.setLatLng([uLat, uLng]);
         }
 
-        // Find Nearest Stop
-        let nearestStop = null;
-        let minDistance = Infinity;
+        let nearest = null;
+        let minDist = Infinity;
 
         busStops.forEach(stop => {
           const dist = getDistanceInMeters(uLat, uLng, stop.lat, stop.lng);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestStop = stop;
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = stop;
           }
         });
 
-        map.setView([uLat, uLng], 17);
+        map.setView([uLat, uLng], 16);
         userMarker.bindPopup(`
           <b>Your Location</b><br/>
-          Nearest Stop: <b>${nearestStop.name}</b> (${Math.round(minDistance)}m away)
+          Nearest Stop: <b>${nearest.name}</b> (${Math.round(minDist)}m)
         `).openPopup();
-      }, (err) => {
-        alert("Unable to fetch location: " + err.message);
       });
     }
 
-    // 4. FIREBASE REALTIME LISTENERS (RUQAYYAH & SALAHUDDIN)
     const firebaseConfig = {
       apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
       authDomain: "smartbus-iium.firebaseapp.com",
@@ -203,50 +228,79 @@
     const db = firebase.firestore();
 
     db.collection("buses").onSnapshot((snapshot) => {
-      let activeNames = [];
+      let activeList = [];
+      let busDataArray = [];
+      let currentBusNamesInDb = new Set();
 
       snapshot.forEach(doc => {
         const bus = doc.data();
         if (!bus.lat || !bus.lng) return;
 
-        activeNames.push(bus.name);
+        currentBusNamesInDb.add(bus.name);
+        busDataArray.push(bus);
+        activeList.push(bus.name);
+
+        const popupText = `
+          <b>Bus ${bus.name}</b><br/>
+          Speed: <b>${bus.speedKmH || 0} km/h</b><br/>
+          Occupancy: <b>${bus.occupancy || 'Unknown'}</b>
+        `;
 
         if (!activeBuses[bus.name]) {
-          activeBuses[bus.name] = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map)
-            .bindPopup(`<b>Bus ${bus.name}</b>`);
+          activeBuses[bus.name] = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map).bindPopup(popupText);
         } else {
-          activeBuses[bus.name].setLatLng([bus.lat, bus.lng]);
+          activeBuses[bus.name].setLatLng([bus.lat, bus.lng]).setPopupContent(popupText);
         }
       });
 
-      if (activeNames.length > 0) {
-        document.getElementById("status-text").innerText = `Active Buses: ${activeNames.join(", ")}`;
-      }
+      // Remove map markers for buses that went offline/deleted from database
+      Object.keys(activeBuses).forEach(busName => {
+        if (!currentBusNamesInDb.has(busName)) {
+          map.removeLayer(activeBuses[busName]);
+          delete activeBuses[busName];
+        }
+      });
 
-      // Update Stop ETAs based on closest active bus
+      document.getElementById("status-text").innerText = activeList.length > 0 
+        ? `Active Fleet: ${activeList.join(", ")}` 
+        : "No Active Buses Broadcasting";
+
+      // Reset or update stop popups
       busStops.forEach(stop => {
         let minEta = Infinity;
-        let closestBusName = "";
+        let selectedBus = null;
 
-        snapshot.forEach(doc => {
-          const bus = doc.data();
+        busDataArray.forEach(bus => {
           const distMeters = getDistanceInMeters(bus.lat, bus.lng, stop.lat, stop.lng);
           const distKm = distMeters / 1000;
-          const speedKmH = (bus.speed > 5) ? bus.speed : 18;
-          const eta = Math.round((distKm / speedKmH) * 60);
+          const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18;
+          const eta = Math.round((distKm / effectiveSpeed) * 60);
 
           if (eta < minEta) {
             minEta = eta;
-            closestBusName = bus.name;
+            selectedBus = bus;
           }
         });
 
         const marker = stopMarkers[stop.id];
-        if (minEta !== Infinity) {
+        if (selectedBus) {
           marker.setPopupContent(`
-            <b>${stop.name}</b><br/>
-            Next Arrival: <b>${minEta} mins</b> (${closestBusName})<br/>
-            <a href="${stop.mapsUrl}" target="_blank" class="info-btn">ⓘ 360° / View Stop Photo</a>
+            <div style="font-size:13px;">
+              <b>${stop.name}</b><br/>
+              Next Bus: <b>${selectedBus.name}</b><br/>
+              ETA: <b>${minEta} mins</b> (${Math.round(getDistanceInMeters(selectedBus.lat, selectedBus.lng, stop.lat, stop.lng))}m away)<br/>
+              Bus Speed: <b>${selectedBus.speedKmH || 0} km/h</b><br/>
+              Occupancy: <b>${selectedBus.occupancy || 'Normal'}</b><br/>
+              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
+            </div>
+          `);
+        } else {
+          marker.setPopupContent(`
+            <div style="font-size:13px;">
+              <b>${stop.name}</b><br/>
+              Status: <i>No active buses...</i><br/>
+              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
+            </div>
           `);
         }
       });
