@@ -144,7 +144,6 @@
     let routePolyline = null;
     let nodeDistancesRoad = [];
 
-    // Pre-calculate exact OSRM road distance between sequential nodes
     async function initRoadGeometries() {
       const coordString = routeLoop.map(s => `${s.lng},${s.lat}`).join(';') + `;${routeLoop[0].lng},${routeLoop[0].lat}`;
       const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson&steps=true`;
@@ -165,9 +164,8 @@
             lineJoin: 'round'
           }).addTo(map);
 
-          // Store OSRM leg distances between consecutive stops
           if (route.legs) {
-            nodeDistancesRoad = route.legs.map(leg => leg.distance); // distance in meters
+            nodeDistancesRoad = route.legs.map(leg => leg.distance);
           }
         }
       } catch (err) {
@@ -218,165 +216,4 @@
       return closestIdx;
     }
 
-    // Precise road network calculation for ETA
-    function calculateRouteEta(bus, targetStopIdx) {
-      const currentBusIdx = getClosestNodeIndex(bus.lat, bus.lng);
-      
-      let totalDistanceMeters = 0;
-      let stationCount = 0;
-      let idx = currentBusIdx;
-
-      // Distance from live bus coordinates to its upcoming node
-      totalDistanceMeters += getDistanceInMeters(bus.lat, bus.lng, routeLoop[idx].lat, routeLoop[idx].lng);
-
-      // Traversal using pre-calculated OSRM road distances between nodes
-      while (idx !== targetStopIdx) {
-        const legDist = (nodeDistancesRoad.length > idx) 
-          ? nodeDistancesRoad[idx] 
-          : getDistanceInMeters(routeLoop[idx].lat, routeLoop[idx].lng, routeLoop[(idx + 1) % routeLoop.length].lat, routeLoop[(idx + 1) % routeLoop.length].lng);
-        
-        totalDistanceMeters += legDist;
-        stationCount++;
-        idx = (idx + 1) % routeLoop.length;
-      }
-
-      // Constantly use bus speed broadcast live from GPS; fallback to 18 km/h baseline if idling/stopped
-      const currentLiveSpeed = bus.speedKmH;
-      const effectiveSpeed = (currentLiveSpeed && currentLiveSpeed > 5) ? currentLiveSpeed : 18;
-      
-      const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
-      const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS;
-
-      return {
-        eta: Math.max(1, Math.round(travelTimeMinutes + dwellDelayMinutes)),
-        distanceMeters: Math.round(totalDistanceMeters),
-        intermediateStops: stationCount,
-        liveSpeedUsed: effectiveSpeed
-      };
-    }
-
-    function locateUser() {
-      if (!("geolocation" in navigator)) {
-        alert("Location access unavailable.");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const uLat = pos.coords.latitude;
-        const uLng = pos.coords.longitude;
-
-        if (!userMarker) {
-          userMarker = L.marker([uLat, uLng], { icon: personIcon }).addTo(map);
-        } else {
-          userMarker.setLatLng([uLat, uLng]);
-        }
-
-        let nearest = null;
-        let minDist = Infinity;
-
-        routeLoop.forEach(stop => {
-          const dist = getDistanceInMeters(uLat, uLng, stop.lat, stop.lng);
-          if (dist < minDist) {
-            minDist = dist;
-            nearest = stop;
-          }
-        });
-
-        map.setView([uLat, uLng], 16);
-        userMarker.bindPopup(`
-          <b>Your Location</b><br/>
-          Nearest Stop: <b>${nearest.name}</b> (${Math.round(minDist)}m)
-        `).openPopup();
-      });
-    }
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
-      authDomain: "smartbus-iium.firebaseapp.com",
-      projectId: "smartbus-iium",
-      storageBucket: "smartbus-iium.firebasestorage.app",
-      messagingSenderId: "920517840888",
-      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
-      measurementId: "G-EDHGR3H4X3"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    db.collection("buses").onSnapshot((snapshot) => {
-      let activeList = [];
-      let busDataArray = [];
-      let currentBusNamesInDb = new Set();
-
-      snapshot.forEach(doc => {
-        const bus = doc.data();
-        if (!bus.lat || !bus.lng) return;
-
-        currentBusNamesInDb.add(bus.name);
-        busDataArray.push(bus);
-        activeList.push(bus.name);
-
-        const popupText = `
-          <b>Bus ${bus.name}</b><br/>
-          Live Speed: <b>${bus.speedKmH || 0} km/h</b><br/>
-          Occupancy: <b>${bus.occupancy || 'Unknown'}</b>
-        `;
-
-        if (!activeBuses[bus.name]) {
-          activeBuses[bus.name] = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map).bindPopup(popupText);
-        } else {
-          activeBuses[bus.name].setLatLng([bus.lat, bus.lng]).setPopupContent(popupText);
-        }
-      });
-
-      Object.keys(activeBuses).forEach(busName => {
-        if (!currentBusNamesInDb.has(busName)) {
-          map.removeLayer(activeBuses[busName]);
-          delete activeBuses[busName];
-        }
-      });
-
-      document.getElementById("status-text").innerText = activeList.length > 0 
-        ? `Active Fleet: ${activeList.join(", ")}` 
-        : "No Active Buses Broadcasting";
-
-      routeLoop.forEach((stop, targetIdx) => {
-        let minEta = Infinity;
-        let selectedBus = null;
-        let bestRouteDetails = null;
-
-        busDataArray.forEach(bus => {
-          const routeDetails = calculateRouteEta(bus, targetIdx);
-          if (routeDetails.eta < minEta) {
-            minEta = routeDetails.eta;
-            selectedBus = bus;
-            bestRouteDetails = routeDetails;
-          }
-        });
-
-        const marker = stopMarkers[stop.id];
-        if (selectedBus && bestRouteDetails) {
-          marker.setPopupContent(`
-            <div style="font-size:13px;">
-              <b>${stop.name}</b><br/>
-              Next Bus: <b>${selectedBus.name}</b><br/>
-              ETA: <b>${minEta} mins</b> (${bestRouteDetails.distanceMeters}m via road)<br/>
-              Stops Remaining: <b>${bestRouteDetails.intermediateStops}</b><br/>
-              Calc. Speed: <b>${bestRouteDetails.liveSpeedUsed} km/h</b><br/>
-              Occupancy: <b>${selectedBus.occupancy || 'Normal'}</b><br/>
-              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
-            </div>
-          `);
-        } else {
-          marker.setPopupContent(`
-            <div style="font-size:13px;">
-              <b>${stop.name}</b><br/>
-              Status: <i>No active buses...</i><br/>
-              <a href="${stop.maps}" target="_blank" class="info-btn">ⓘ View Stop on Google Maps</a>
-            </div>
-          `);
-        }
-      });
-    });
-  </script>
-</body>
-</html>
+    function calculateRouteEta(bus, targetStopIdx
