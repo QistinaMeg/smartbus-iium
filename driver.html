@@ -173,92 +173,98 @@
   </div>
 
   <script>
-    // -----------------------------------------------------------------
-    // Firebase Setup
-    // -----------------------------------------------------------------
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
+      authDomain: "smartbus-iium.firebaseapp.com",
+      projectId: "smartbus-iium",
+      storageBucket: "smartbus-iium.firebasestorage.app",
+      messagingSenderId: "920517840888",
+      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
+      measurementId: "G-EDHGR3H4X3"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.firestore();
 
     let currentBusDocId = null;
     let watchPositionId = null;
 
     async function startAutoSession() {
+      const startBtn = document.getElementById("start-btn");
       const selectedTerminal = document.getElementById("terminal").value;
 
-      // Extra guard against disabled options
       if (selectedTerminal === "Salahuddin") {
         alert("Salahuddin route is currently disabled.");
         return;
       }
 
-      // 1. Query Firestore for active buses on this route
-      const snapshot = await db.collection("buses")
-        .where("startTerminal", "==", selectedTerminal)
-        .get();
+      startBtn.disabled = true;
+      startBtn.innerText = "Connecting...";
 
-      // 2. Identify occupied bus numbers
-      const activeNumbers = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.busNumber) activeNumbers.push(data.busNumber);
-      });
+      try {
+        const snapshot = await db.collection("buses")
+          .where("startTerminal", "==", selectedTerminal)
+          .get();
 
-      // 3. Increment for lowest available slot
-      let assignedNumber = 1;
-      while (activeNumbers.includes(assignedNumber)) {
-        assignedNumber++;
-      }
+        const activeNumbers = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.busNumber) activeNumbers.push(data.busNumber);
+        });
 
-      // 4. Construct auto-assigned bus ID & name
-      const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
-      currentBusDocId = `bus_${selectedTerminal.toLowerCase()}_${assignedNumber}`;
+        let assignedNumber = 1;
+        while (activeNumbers.includes(assignedNumber)) {
+          assignedNumber++;
+        }
 
-      // 5. Initialize Firebase document
-      await db.collection("buses").doc(currentBusDocId).set({
-        name: autoBusName,
-        startTerminal: selectedTerminal,
-        busNumber: assignedNumber,
-        lat: 3.2520,
-        lng: 101.7345,
-        speedKmH: 0,
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-      });
+        const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
+        currentBusDocId = `bus_${selectedTerminal.toLowerCase()}_${assignedNumber}`;
 
-      // UI updates
-      document.getElementById("driver-status").innerText = "Broadcasting Live";
-      document.getElementById("driver-status").classList.add("active");
-      document.getElementById("assigned-name").innerText = `Assigned: ${autoBusName}`;
-      document.getElementById("start-btn").style.display = "none";
-      document.getElementById("stop-btn").style.display = "block";
-      document.getElementById("terminal").disabled = true;
+        await db.collection("buses").doc(currentBusDocId).set({
+          name: autoBusName,
+          startTerminal: selectedTerminal,
+          busNumber: assignedNumber,
+          lat: 3.2520,
+          lng: 101.7345,
+          speedKmH: 0,
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-      // 6. Geolocation tracking
-      if ("geolocation" in navigator) {
-        watchPositionId = navigator.geolocation.watchPosition((pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const speedKmH = Math.round((pos.coords.speed || 0) * 3.6);
+        document.getElementById("driver-status").innerText = "Broadcasting Live";
+        document.getElementById("driver-status").classList.add("active");
+        document.getElementById("assigned-name").innerText = `Assigned: ${autoBusName}`;
+        startBtn.style.display = "none";
+        document.getElementById("stop-btn").style.display = "block";
+        document.getElementById("terminal").disabled = true;
 
-          document.getElementById("gps-info").innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)} | Speed: ${speedKmH} km/h`;
+        if ("geolocation" in navigator) {
+          watchPositionId = navigator.geolocation.watchPosition((pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const speedKmH = Math.round((pos.coords.speed || 0) * 3.6);
 
-          db.collection("buses").doc(currentBusDocId).update({
-            lat: lat,
-            lng: lng,
-            speedKmH: speedKmH,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
-      } else {
-        alert("Geolocation is not supported by your browser.");
+            document.getElementById("gps-info").innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)} | Speed: ${speedKmH} km/h`;
+
+            db.collection("buses").doc(currentBusDocId).update({
+              lat: lat,
+              lng: lng,
+              speedKmH: speedKmH,
+              lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(e => console.error("Update error:", e));
+          }, (err) => {
+            alert("GPS Error: " + err.message + ". Ensure location permissions are allowed in your browser.");
+          }, { enableHighAccuracy: true, maximumAge: 0 });
+        } else {
+          alert("Geolocation is not supported by your browser.");
+        }
+
+      } catch (error) {
+        console.error("Broadcast Start Error:", error);
+        alert("Broadcast failed: " + error.message);
+        startBtn.disabled = false;
+        startBtn.innerText = "Start Route Broadcast";
       }
     }
 
@@ -268,14 +274,22 @@
       }
 
       if (currentBusDocId) {
-        await db.collection("buses").doc(currentBusDocId).delete();
+        try {
+          await db.collection("buses").doc(currentBusDocId).delete();
+        } catch (e) {
+          console.error("Delete error:", e);
+        }
       }
 
-      // Reset UI state
       document.getElementById("driver-status").innerText = "Offline";
       document.getElementById("driver-status").classList.remove("active");
       document.getElementById("assigned-name").innerText = "";
-      document.getElementById("start-btn").style.display = "block";
+      
+      const startBtn = document.getElementById("start-btn");
+      startBtn.disabled = false;
+      startBtn.innerText = "Start Route Broadcast";
+      startBtn.style.display = "block";
+      
       document.getElementById("stop-btn").style.display = "none";
       document.getElementById("terminal").disabled = false;
       document.getElementById("gps-info").innerText = "GPS inactive. Click Start to broadcast coordinates.";
