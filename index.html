@@ -118,30 +118,34 @@
     const stopIcon = L.divIcon({ html: `<div style="font-size:20px;">🚏</div>`, className: 'custom-icon', iconSize: [22, 22], iconAnchor: [11, 11] });
     const personIcon = L.divIcon({ html: `<div style="font-size:24px;">🚶</div>`, className: 'custom-icon', iconSize: [28, 28], iconAnchor: [14, 14] });
 
-    // Strict Sequential Drivable Campus Route Loop Nodes
+    // ROUTE 1: RUQAYYAH BUS Sequential Coordinates Order
     const routeLoop = [
-      { id: "ruqayyah", name: "Ruqayyah Bus Stop", lat: 3.25055, lng: 101.73719, maps: "https://maps.google.com/?q=3.25055,101.73719" },
-      { id: "sl158", name: "SL158 Kulliyyah of Education UIAM", lat: 3.25367, lng: 101.73356, maps: "https://maps.google.com/?q=3.25367,101.73356" },
-      { id: "sl159", name: "SL159 UIAM (Utara)", lat: 3.25595, lng: 101.73177, maps: "https://maps.google.com/?q=3.25595,101.73177" },
-      { id: "sl161", name: "SL161 Perpustakaan UIAM / CELPAD", lat: 3.25244, lng: 101.72793, maps: "https://maps.google.com/?q=3.25244,101.72793" },
-      { id: "sl162", name: "SL162 Hub UIA", lat: 3.25141, lng: 101.72624, maps: "https://maps.google.com/?q=3.25141,101.72624" },
-      { id: "sl152", name: "SL152 UIAM (Timur)", lat: 3.24921, lng: 101.73030, maps: "https://maps.google.com/?q=3.24921,101.73030" },
-      { id: "sl153", name: "SL153 (KENMS)", lat: 3.25043, lng: 101.73099, maps: "https://maps.google.com/?q=3.25043,101.73099" },
-      { id: "sl154", name: "SL154 Mahallah Safiyyah", lat: 3.25076, lng: 101.73295, maps: "https://maps.google.com/?q=3.25076,101.73295" },
-      { id: "sl155", name: "SL155 UIAM (Selatan)", lat: 3.24976, lng: 101.73489, maps: "https://maps.google.com/?q=3.24976,101.73489" },
-      { id: "sl156", name: "SL156 KAED UIAM", lat: 3.25144, lng: 101.73587, maps: "https://maps.google.com/?q=3.25144,101.73587" },
-      { id: "sl157", name: "SL157 Kulliyyah of Engineering UIAM", lat: 3.25304, lng: 101.73714, maps: "https://maps.google.com/?q=3.25304,101.73714" }
+      { id: "ruqayyah_1", name: "Ruqayyah Bus Stop", lat: 3.2592431, lng: 101.7344153, maps: "https://maps.google.com/?q=3.2592431,101.7344153" },
+      { id: "asiah_1", name: "Asiah", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" },
+      { id: "asma_1", name: "Asma", lat: 3.2556537, lng: 101.7331765, maps: "https://maps.google.com/?q=3.2556537,101.7331765" },
+      { id: "koed", name: "KOED", lat: 3.2540671, lng: 101.7334601, maps: "https://maps.google.com/?q=3.2540671,101.7334601" },
+      { id: "uiam_utara", name: "UIAM (Utara)", lat: 3.2540413, lng: 101.7342752, maps: "https://maps.google.com/?q=3.2540413,101.7342752" },
+      { id: "celpad_irkhs", name: "CELPAD / IRKHS", lat: 3.2529524, lng: 101.7358952, maps: "https://maps.google.com/?q=3.2529524,101.7358952" },
+      { id: "library_uiam", name: "Library UIAM", lat: 3.2521544, lng: 101.7385687, maps: "https://maps.google.com/?q=3.2521544,101.7385687" },
+      { id: "uiam_timur", name: "UIAM (Timur)", lat: 3.2497098, lng: 101.7388872, maps: "https://maps.google.com/?q=3.2497098,101.7388872" },
+      { id: "kenms", name: "KENMS", lat: 3.2491997, lng: 101.7368075, maps: "https://maps.google.com/?q=3.2491997,101.7368075" },
+      { id: "safiyyah", name: "Safiyyah", lat: 3.2493858, lng: 101.7347811, maps: "https://maps.google.com/?q=3.2493858,101.7347811" },
+      { id: "kaed", name: "KAED", lat: 3.2506859, lng: 101.7312782, maps: "https://maps.google.com/?q=3.2506859,101.7312782" },
+      { id: "kict", name: "KICT", lat: 3.2543536, lng: 101.7288605, maps: "https://maps.google.com/?q=3.2543536,101.7288605" },
+      { id: "koe", name: "KOE", lat: 3.2542398, lng: 101.7321465, maps: "https://maps.google.com/?q=3.2542398,101.7321465" },
+      { id: "asma_return", name: "Asma (Return)", lat: 3.2556537, lng: 101.7331765, maps: "https://maps.google.com/?q=3.2556537,101.7331765" },
+      { id: "asiah_return", name: "Asiah (Return)", lat: 3.2573779, lng: 101.7335403, maps: "https://maps.google.com/?q=3.2573779,101.7335403" }
     ];
 
-    const STOP_DWELL_TIME_MINS = 1; // 1-minute pickup/dropoff buffer per station along the route
+    const STOP_DWELL_TIME_MINS = 1; // 1-minute dropoff/pickup buffer per intermediate stop
 
-    const map = L.map('map', { zoomControl: false }).setView([3.2520, 101.7330], 15);
+    const map = L.map('map', { zoomControl: false }).setView([3.2535, 101.7340], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     // Draw Route Loop Line on Map
     const loopCoords = routeLoop.map(stop => [stop.lat, stop.lng]);
-    loopCoords.push([routeLoop[0].lat, routeLoop[0].lng]); // Connect back to Ruqayyah
+    loopCoords.push([routeLoop[0].lat, routeLoop[0].lng]); // Connect back to Ruqayyah start node
     L.polyline(loopCoords, { color: '#2563eb', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
 
     const stopMarkers = {};
@@ -203,9 +207,9 @@
         idx = nextIdx;
       }
 
-      const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18; // Default 18 km/h speed
+      const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18; // Default 18 km/h campus speed
       const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
-      const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS; // Pickup/dropoff delay for each station passed
+      const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS;
 
       return {
         eta: Math.round(travelTimeMinutes + dwellDelayMinutes),
