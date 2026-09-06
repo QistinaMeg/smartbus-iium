@@ -1,53 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SmartBus IIUM - Driver Console</title>
+  <title>SmartBus IIUM - Driver Interface</title>
+
+  <!-- Firebase v9 Compatibility SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f8fafc; color: #0f172a; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; margin: 0 auto; }
-    h2 { margin-top: 0; }
-    label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 6px; }
-    select, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; font-size: 15px; border: 1px solid #cbd5e1; }
-    button.btn-start { background: #22c55e; color: white; border: none; font-weight: bold; cursor: pointer; }
-    button.btn-stop { background: #ef4444; color: white; border: none; font-weight: bold; cursor: pointer; display: none; }
-    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #e2e8f0; }
-    .active { background: #dcfce7; color: #166534; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: #f1f5f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 420px;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .header h2 {
+      font-size: 1.4rem;
+      color: #0f172a;
+    }
+
+    .header p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .status-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      margin-bottom: 20px;
+    }
+
+    .status-badge {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: #ef4444;
+    }
+
+    .status-badge.active {
+      color: #16a34a;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      background: #ffffff;
+    }
+
+    select:disabled {
+      background: #f1f5f9;
+      cursor: not-allowed;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-start {
+      background: #2563eb;
+      color: #ffffff;
+    }
+
+    .btn-start:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-stop {
+      background: #dc2626;
+      color: #ffffff;
+      display: none;
+      margin-top: 10px;
+    }
+
+    .btn-stop:hover {
+      background: #b91c1c;
+    }
+
+    .gps-box {
+      margin-top: 20px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #334155;
+      text-align: center;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
 
   <div class="card">
-    <h2>🚌 Driver Broadcast</h2>
-    
-    <label for="terminal">Starting Terminal:</label>
-    <select id="terminal">
-      <option value="Ruqayyah">Ruqayyah</option>
-      <option value="Salahuddin">Salahuddin</option>
-      <option value="Mahallah Asiah">Mahallah Asiah</option>
-    </select>
+    <div class="header">
+      <h2>Driver Terminal Broadcasting</h2>
+      <p>Select your starting route to initiate tracking</p>
+    </div>
 
-    <button id="start-btn" class="btn-start" onclick="startAutoSession()">▶ Start Route Broadcast</button>
-    <button id="stop-btn" class="btn-stop" onclick="stopAutoSession()">⏹ Stop Route Broadcast</button>
+    <div class="status-box">
+      <span>Status:</span>
+      <span class="status-badge" id="driver-status">Offline</span>
+    </div>
 
-    <p>Status: <span id="driver-status" class="status-badge">Offline</span></p>
-    <p id="assigned-name" style="font-weight:600; color:#2563eb;"></p>
-    <p id="gps-info" style="font-size:12px; color:#64748b;"></p>
+    <div class="form-group">
+      <label for="terminal">Select Starting Route / Terminal:</label>
+      <select id="terminal">
+        <option value="Ruqayyah" selected>Ruqayyah Terminal (Main Loop)</option>
+        <option value="Salahuddin" disabled>Salahuddin Terminal (Disabled)</option>
+      </select>
+    </div>
+
+    <div id="assigned-name" style="text-align:center; font-weight:bold; margin-bottom:15px; color:#1e293b;"></div>
+
+    <button class="btn btn-start" id="start-btn" onclick="startAutoSession()">Start Route Broadcast</button>
+    <button class="btn btn-stop" id="stop-btn" onclick="stopSession()">Stop Route Broadcast</button>
+
+    <div class="gps-box" id="gps-info">GPS inactive. Click Start to broadcast coordinates.</div>
   </div>
 
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-
   <script>
+    // -----------------------------------------------------------------
+    // Firebase Setup
+    // -----------------------------------------------------------------
     const firebaseConfig = {
-      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
-      authDomain: "smartbus-iium.firebaseapp.com",
-      projectId: "smartbus-iium",
-      storageBucket: "smartbus-iium.firebasestorage.app",
-      messagingSenderId: "920517840888",
-      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
-      measurementId: "G-EDHGR3H4X3"
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -57,42 +194,46 @@
     async function startAutoSession() {
       const selectedTerminal = document.getElementById("terminal").value;
 
-      // 1. Check active buses for this terminal
+      // Extra guard against disabled options
+      if (selectedTerminal === "Salahuddin") {
+        alert("Salahuddin route is currently disabled.");
+        return;
+      }
+
+      // 1. Query Firestore for active buses on this route
       const snapshot = await db.collection("buses")
         .where("startTerminal", "==", selectedTerminal)
         .get();
 
-      // 2. Gather currently assigned numbers
+      // 2. Identify occupied bus numbers
       const activeNumbers = [];
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.busNumber) activeNumbers.push(data.busNumber);
       });
 
-      // 3. Find lowest free slot (1, 2, 3...)
+      // 3. Increment for lowest available slot
       let assignedNumber = 1;
       while (activeNumbers.includes(assignedNumber)) {
         assignedNumber++;
       }
 
-      // 4. Form auto name
+      // 4. Construct auto-assigned bus ID & name
       const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
-      currentBusDocId = `bus_${selectedTerminal.toLowerCase().replace(/\s+/g, '_')}_${assignedNumber}`;
+      currentBusDocId = `bus_${selectedTerminal.toLowerCase()}_${assignedNumber}`;
 
-      // 5. Create document in Firebase
+      // 5. Initialize Firebase document
       await db.collection("buses").doc(currentBusDocId).set({
         name: autoBusName,
         startTerminal: selectedTerminal,
         busNumber: assignedNumber,
-        lat: 3.2592484,
-        lng: 101.7343945,
+        lat: 3.2520,
+        lng: 101.7345,
         speedKmH: 0,
-        occupancy: "Normal",
-        hasStartedFromRuqayyah: true,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      // UI Update
+      // UI updates
       document.getElementById("driver-status").innerText = "Broadcasting Live";
       document.getElementById("driver-status").classList.add("active");
       document.getElementById("assigned-name").innerText = `Assigned: ${autoBusName}`;
@@ -100,7 +241,7 @@
       document.getElementById("stop-btn").style.display = "block";
       document.getElementById("terminal").disabled = true;
 
-      // 6. Start watching real GPS
+      // 6. Geolocation tracking
       if ("geolocation" in navigator) {
         watchPositionId = navigator.geolocation.watchPosition((pos) => {
           const lat = pos.coords.latitude;
@@ -116,30 +257,29 @@
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
           });
         }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+      } else {
+        alert("Geolocation is not supported by your browser.");
       }
     }
 
-    async function stopAutoSession() {
-      if (watchPositionId) navigator.geolocation.clearWatch(watchPositionId);
+    async function stopSession() {
+      if (watchPositionId) {
+        navigator.geolocation.clearWatch(watchPositionId);
+      }
 
       if (currentBusDocId) {
         await db.collection("buses").doc(currentBusDocId).delete();
-        currentBusDocId = null;
       }
 
+      // Reset UI state
       document.getElementById("driver-status").innerText = "Offline";
       document.getElementById("driver-status").classList.remove("active");
       document.getElementById("assigned-name").innerText = "";
-      document.getElementById("gps-info").innerText = "";
       document.getElementById("start-btn").style.display = "block";
       document.getElementById("stop-btn").style.display = "none";
       document.getElementById("terminal").disabled = false;
+      document.getElementById("gps-info").innerText = "GPS inactive. Click Start to broadcast coordinates.";
     }
-
-    // Clean up if tab/browser is closed
-    window.addEventListener("beforeunload", () => {
-      stopAutoSession();
-    });
   </script>
 </body>
 </html>
