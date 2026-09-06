@@ -191,14 +191,24 @@
     let currentBusDocId = null;
     let watchPositionId = null;
 
+    // Direct REST API deletion for guaranteed tab cleanup
+    function forceDeleteBusDoc() {
+      if (!currentBusDocId) return;
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/buses/${currentBusDocId}`;
+      fetch(url, { method: 'DELETE', keepalive: true }).catch(() => {});
+    }
+
+    window.addEventListener("beforeunload", () => {
+      forceDeleteBusDoc();
+    });
+
+    window.addEventListener("pagehide", () => {
+      forceDeleteBusDoc();
+    });
+
     async function startAutoSession() {
       const startBtn = document.getElementById("start-btn");
       const selectedTerminal = document.getElementById("terminal").value;
-
-      if (selectedTerminal === "Salahuddin") {
-        alert("Salahuddin route is currently disabled.");
-        return;
-      }
 
       startBtn.disabled = true;
       startBtn.innerText = "Connecting...";
@@ -254,7 +264,7 @@
               lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             }).catch(e => console.error("Update error:", e));
           }, (err) => {
-            alert("GPS Error: " + err.message + ". Ensure location permissions are allowed in your browser.");
+            alert("GPS Error: " + err.message);
           }, { enableHighAccuracy: true, maximumAge: 0 });
         } else {
           alert("Geolocation is not supported by your browser.");
@@ -271,6 +281,7 @@
     async function stopSession() {
       if (watchPositionId) {
         navigator.geolocation.clearWatch(watchPositionId);
+        watchPositionId = null;
       }
 
       if (currentBusDocId) {
@@ -279,6 +290,7 @@
         } catch (e) {
           console.error("Delete error:", e);
         }
+        currentBusDocId = null;
       }
 
       document.getElementById("driver-status").innerText = "Offline";
