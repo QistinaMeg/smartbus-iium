@@ -3,471 +3,1199 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SmartBus IIUM - Driver Console</title>
+
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f8fafc; color: #0f172a; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; margin: 0 auto; }
-    h2 { margin-top: 0; }
-    label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 6px; }
-    select, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; font-size: 15px; border: 1px solid #cbd5e1; }
-    button.btn-start { background: #22c55e; color: white; border: none; font-weight: bold; cursor: pointer; }
-    button.btn-stop { background: #ef4444; color: white; border: none; font-weight: bold; cursor: pointer; display: none; }
-    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #e2e8f0; }
-    .active { background: #dcfce7; color: #166534; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    select,
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      border: 1px solid #cbd5e1;
+    }
+
+    button.btn-start {
+      background: #22c55e;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button.btn-stop {
+      background: #ef4444;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      display: none;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      background: #e2e8f0;
+    }
+
+    .active {
+      background: #dcfce7;
+      color: #166534;
+    }
   </style>
 </head>
+
 <body>
 
   <div class="card">
+
     <h2>🚌 Driver Broadcast</h2>
-    
+
     <label for="terminal">Starting Terminal:</label>
+
     <select id="terminal">
       <option value="Ruqayyah">Ruqayyah</option>
       <option value="Salahuddin">Salahuddin</option>
     </select>
 
-    <label for="occupancy">Current Occupancy:</label>
-<select id="occupancy">
-  <option value="Low">Low</option>
-  <option value="Normal" selected>Normal</option>
-  <option value="High">High</option>
-  <option value="Full">Full</option>
-</select>
-    
-    <button id="start-btn" class="btn-start" onclick="startAutoSession()">▶ Start Route Broadcast</button>
-    <button id="stop-btn" class="btn-stop" onclick="stopAutoSession()">⏹ Stop Route Broadcast</button>
 
-    <p>Status: <span id="driver-status" class="status-badge">Offline</span></p>
-    <p id="assigned-name" style="font-weight:600; color:#2563eb;"></p>
-    <p id="gps-info" style="font-size:12px; color:#64748b;"></p>
+    <label for="occupancy">Current Occupancy:</label>
+
+    <select id="occupancy">
+      <option value="Low">Low</option>
+      <option value="Normal" selected>Normal</option>
+      <option value="High">High</option>
+      <option value="Full">Full</option>
+    </select>
+
+
+    <button
+      id="start-btn"
+      class="btn-start"
+      onclick="startAutoSession()"
+    >
+      ▶ Start Route Broadcast
+    </button>
+
+
+    <button
+      id="stop-btn"
+      class="btn-stop"
+      onclick="stopAutoSession()"
+    >
+      ⏹ Stop Route Broadcast
+    </button>
+
+
+    <p>
+      Status:
+      <span id="driver-status" class="status-badge">
+        Offline
+      </span>
+    </p>
+
+
+    <p
+      id="assigned-name"
+      style="font-weight:600; color:#2563eb;"
+    ></p>
+
+
+    <p
+      id="gps-info"
+      style="font-size:12px; color:#64748b;"
+    ></p>
+
   </div>
 
+
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
+
   <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
-  authDomain: "smartbus-iium.firebaseapp.com",
-  projectId: "smartbus-iium",
-  storageBucket: "smartbus-iium.firebasestorage.app",
-  messagingSenderId: "920517840888",
-  appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
-  measurementId: "G-EDHGR3H4X3"
-};
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+    // ============================================
+    // FIREBASE CONFIGURATION
+    // ============================================
 
-let currentBusDocId = null;
-let watchPositionId = null;
-let previousPosition = null;
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28M",
+      authDomain: "smartbus-iium.firebaseapp.com",
+      projectId: "smartbus-iium",
+      storageBucket: "smartbus-iium.firebasestorage.app",
+      messagingSenderId: "920517840888",
+      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
+      measurementId: "G-EDHGR3H4X3"
+    };
 
-const SPEED_HISTORY_SIZE = 8;
 
-// Only speeds above this are considered actual movement
-const MIN_MOVEMENT_SPEED = 0.8;
+    firebase.initializeApp(firebaseConfig);
 
-// Ignore unrealistic GPS speed spikes
-const MAX_REASONABLE_SPEED = 80;
+    const db = firebase.firestore();
 
-let speedHistory = [];
-let smoothedAverageSpeed = 0;
 
-const SAVED_BUS_ID_KEY = "smartbus_current_bus_id";
+    // ============================================
+    // VARIABLES
+    // ============================================
 
-function getDistanceInMeters(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
+    let currentBusDocId = null;
 
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
+    let watchPositionId = null;
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    let previousPosition = null;
 
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
-async function startAutoSession() {
-  const selectedTerminal = document.getElementById("terminal").value;
-  const selectedOccupancy = document.getElementById("occupancy").value;
+    // ============================================
+    // SMART MOVING AVERAGE SETTINGS
+    // ============================================
 
-  const snapshot = await db.collection("buses")
-    .where("startTerminal", "==", selectedTerminal)
-    .get();
+    // Number of recent movement readings to remember
+    const SPEED_HISTORY_SIZE = 8;
 
-  const activeNumbers = [];
 
-  snapshot.forEach(doc => {
-    const data = doc.data();
+    // Speeds below this are treated as stationary/noise
+    const MIN_MOVEMENT_SPEED = 0.8;
 
-    if (data.busNumber) {
-      activeNumbers.push(data.busNumber);
+
+    // Ignore unrealistic GPS speed spikes
+    const MAX_REASONABLE_SPEED = 80;
+
+
+    // Stores recent meaningful movement speeds
+    let speedHistory = [];
+
+
+    // Smoothed average used for ETA
+    let smoothedAverageSpeed = 0;
+
+
+    // ============================================
+    // LOCAL STORAGE
+    // ============================================
+
+    const SAVED_BUS_ID_KEY =
+      "smartbus_current_bus_id";
+
+
+    // ============================================
+    // DISTANCE CALCULATION
+    // ============================================
+
+    function getDistanceInMeters(
+      lat1,
+      lon1,
+      lat2,
+      lon2
+    ) {
+
+      const R = 6371000;
+
+      const dLat =
+        (lat2 - lat1) * Math.PI / 180;
+
+      const dLon =
+        (lon2 - lon1) * Math.PI / 180;
+
+
+      const a =
+        Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+
+      return R *
+        2 *
+        Math.atan2(
+          Math.sqrt(a),
+          Math.sqrt(1 - a)
+        );
     }
-  });
-
-  let assignedNumber = 1;
-
-  while (activeNumbers.includes(assignedNumber)) {
-    assignedNumber++;
-  }
-
-  const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
-
-  currentBusDocId =
-    `bus_${selectedTerminal.toLowerCase().replace(/\s+/g, '_')}_${assignedNumber}`;
-
-  await db.collection("buses").doc(currentBusDocId).set({
-    name: autoBusName,
-    startTerminal: selectedTerminal,
-    busNumber: assignedNumber,
-    lat: 3.2592484,
-    lng: 101.7343945,
-    speedKmH: 0,
-    occupancy: selectedOccupancy,
-    hasStartedFromRuqayyah: true,
-    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-  });
-
-  localStorage.setItem(SAVED_BUS_ID_KEY, currentBusDocId);
-
-  activateBroadcastUI(autoBusName);
-  startLocationTracking();
-}
-
-function activateBroadcastUI(busName) {
-  document.getElementById("driver-status").innerText =
-    "Broadcasting Live";
-
-  document.getElementById("driver-status").classList.add("active");
-
-  document.getElementById("assigned-name").innerText =
-    `Assigned: ${busName}`;
-
-  document.getElementById("start-btn").style.display = "none";
-
-  document.getElementById("stop-btn").style.display = "block";
-
-  document.getElementById("terminal").disabled = true;
-}
-
-function startLocationTracking() {
-  if (!("geolocation" in navigator)) {
-    alert("GPS location is unavailable on this device.");
-    return;
-  }
-
-  if (watchPositionId !== null) {
-    navigator.geolocation.clearWatch(watchPositionId);
-  }
-
-  watchPositionId = navigator.geolocation.watchPosition(
-    async (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      const currentTime = pos.timestamp;
-
-      let speedKmH = 0;
-
-      /*
-        First priority:
-        Use calculated speed from previous movement.
-
-        This allows walking speeds to be detected even when
-        pos.coords.speed is unavailable.
-      */
-
-// ================================
-// SMART SPEED CALCULATION
-// ================================
-
-let calculatedSpeedKmH = 0;
-
-// Calculate speed using distance travelled
-// between the previous and current GPS positions
-if (previousPosition) {
-  const distance = getDistanceInMeters(
-    previousPosition.lat,
-    previousPosition.lng,
-    lat,
-    lng
-  );
-
-  const timeDifferenceSeconds =
-    (currentTime - previousPosition.timestamp) / 1000;
-
-  // Only calculate if time has passed
-  if (timeDifferenceSeconds > 0) {
-    const speedMetersPerSecond =
-      distance / timeDifferenceSeconds;
-
-    calculatedSpeedKmH =
-      Math.round(speedMetersPerSecond * 3.6 * 10) / 10;
-
-    /*
-      Ignore tiny GPS movements.
-
-      A phone may appear to move 1-3 metres
-      even when completely stationary.
-    */
-    if (distance < 3) {
-      calculatedSpeedKmH = 0;
-    }
-  }
-}
 
 
-// ================================
-// GET THE BEST CURRENT SPEED
-// ================================
+    // ============================================
+    // START ROUTE BROADCAST
+    // ============================================
 
-// Start with calculated speed
-let speedKmH = calculatedSpeedKmH;
-
-/*
-  Some devices provide GPS speed directly.
-  Use it if it is reasonable.
-*/
-if (
-  pos.coords.speed !== null &&
-  pos.coords.speed >= 0
-) {
-  const gpsSpeedKmH =
-    Math.round(pos.coords.speed * 3.6 * 10) / 10;
-
-  if (
-    gpsSpeedKmH >= MIN_MOVEMENT_SPEED &&
-    gpsSpeedKmH <= MAX_REASONABLE_SPEED
-  ) {
-    speedKmH = gpsSpeedKmH;
-  }
-}
-
-
-// ================================
-// SMART MOVING AVERAGE
-// ================================
-
-/*
-  Only add meaningful movement speeds.
-
-  If the bus stops at a traffic light,
-  0 km/h is NOT added to the average.
-
-  This prevents the ETA from suddenly
-  becoming extremely inaccurate.
-*/
-if (
-  speedKmH >= MIN_MOVEMENT_SPEED &&
-  speedKmH <= MAX_REASONABLE_SPEED
-) {
-  speedHistory.push(speedKmH);
-
-  // Keep only the latest 8 movement readings
-  if (speedHistory.length > SPEED_HISTORY_SIZE) {
-    speedHistory.shift();
-  }
-}
-
-
-/*
-  Calculate the average of meaningful
-  recent movement speeds.
-*/
-if (speedHistory.length > 0) {
-  const rawAverageSpeed =
-    speedHistory.reduce(
-      (total, speed) => total + speed,
-      0
-    ) / speedHistory.length;
-
-
-  /*
-    Gradually adjust the average.
-
-    This prevents the ETA from jumping
-    dramatically when a new speed arrives.
-  */
-  if (smoothedAverageSpeed === 0) {
-    smoothedAverageSpeed = rawAverageSpeed;
-  } else {
-    smoothedAverageSpeed =
-      (smoothedAverageSpeed * 0.7) +
-      (rawAverageSpeed * 0.3);
-  }
-}
-
-const roundedAverageSpeed =
-  Math.round(smoothedAverageSpeed * 10) / 10;
-
-
-// ================================
-// SAVE POSITION FOR NEXT UPDATE
-// ================================
-
-previousPosition = {
-  lat: lat,
-  lng: lng,
-  timestamp: currentTime
-};
-
-document.getElementById("gps-info").innerText =
-  `Lat: ${lat.toFixed(5)}, ` +
-  `Lng: ${lng.toFixed(5)} | ` +
-  `Current: ${speedKmH} km/h | ` +
-  `ETA Speed: ${roundedAverageSpeed} km/h`;
-
-      if (!currentBusDocId) return;
+    async function startAutoSession() {
 
       try {
+
+        const selectedTerminal =
+          document.getElementById("terminal").value;
+
+
+        const selectedOccupancy =
+          document.getElementById("occupancy").value;
+
+
+        // ----------------------------------------
+        // FIND EXISTING BUS NUMBERS
+        // ----------------------------------------
+
+        const snapshot =
+          await db.collection("buses")
+            .where(
+              "startTerminal",
+              "==",
+              selectedTerminal
+            )
+            .get();
+
+
+        const activeNumbers = [];
+
+
+        snapshot.forEach(doc => {
+
+          const data = doc.data();
+
+
+          if (data.busNumber) {
+            activeNumbers.push(
+              data.busNumber
+            );
+          }
+
+        });
+
+
+        // ----------------------------------------
+        // FIND FIRST AVAILABLE BUS NUMBER
+        // ----------------------------------------
+
+        let assignedNumber = 1;
+
+
+        while (
+          activeNumbers.includes(
+            assignedNumber
+          )
+        ) {
+
+          assignedNumber++;
+
+        }
+
+
+        // ----------------------------------------
+        // CREATE BUS NAME
+        // ----------------------------------------
+
+        const autoBusName =
+          `${selectedTerminal} Bus ${assignedNumber}`;
+
+
+        // ----------------------------------------
+        // CREATE FIRESTORE DOCUMENT ID
+        // ----------------------------------------
+
+        currentBusDocId =
+          `bus_${selectedTerminal
+            .toLowerCase()
+            .replace(/\s+/g, "_")}_${assignedNumber}`;
+
+
+        // ----------------------------------------
+        // RESET SPEED TRACKING
+        // ----------------------------------------
+
+        previousPosition = null;
+
+        speedHistory = [];
+
+        smoothedAverageSpeed = 0;
+
+
+        // ----------------------------------------
+        // CREATE BUS IN FIRESTORE
+        // ----------------------------------------
+
         await db.collection("buses")
-  .doc(currentBusDocId)
-  .update({
-    lat: lat,
-    lng: lng,
+          .doc(currentBusDocId)
+          .set({
 
-    // Current GPS speed
-    speedKmH: speedKmH,
+            name: autoBusName,
 
-    // Average of the latest 8 speed readings
-    averageSpeedKmH: roundedAverageSpeed,
+            startTerminal:
+              selectedTerminal,
 
-    lastUpdated:
-      firebase.firestore.FieldValue.serverTimestamp()
-  });
+            busNumber:
+              assignedNumber,
+
+
+            // Initial location
+            // This is currently Ruqayyah's location
+            lat: 3.2592484,
+
+            lng: 101.7343945,
+
+
+            // Speed
+            speedKmH: 0,
+
+            averageSpeedKmH: 0,
+
+
+            // Occupancy
+            occupancy:
+              selectedOccupancy,
+
+
+            // Route status
+            hasStartedFromRuqayyah:
+              true,
+
+
+            // Firebase timestamp
+            lastUpdated:
+              firebase.firestore.FieldValue
+                .serverTimestamp()
+
+          });
+
+
+        // ----------------------------------------
+        // REMEMBER CURRENT BUS
+        // ----------------------------------------
+
+        localStorage.setItem(
+          SAVED_BUS_ID_KEY,
+          currentBusDocId
+        );
+
+
+        // ----------------------------------------
+        // UPDATE DRIVER UI
+        // ----------------------------------------
+
+        activateBroadcastUI(
+          autoBusName
+        );
+
+
+        // ----------------------------------------
+        // START GPS
+        // ----------------------------------------
+
+        startLocationTracking();
+
 
       } catch (error) {
-        console.error("GPS update failed:", error);
+
+        console.error(
+          "START ROUTE ERROR:",
+          error
+        );
+
+
+        alert(
+          "Could not start the route broadcast.\n\n" +
+          error.message
+        );
+
+
+        currentBusDocId = null;
+
       }
-    },
 
-    (error) => {
-      console.error("GPS error:", error);
-
-      document.getElementById("gps-info").innerText =
-        "GPS Error: " + error.message;
-    },
-
-    {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 15000
-    }
-  );
-}
-
-async function updateOccupancy() {
-  if (!currentBusDocId) return;
-
-  const occupancy =
-    document.getElementById("occupancy").value;
-
-  await db.collection("buses")
-    .doc(currentBusDocId)
-    .update({
-      occupancy: occupancy,
-      lastUpdated:
-        firebase.firestore.FieldValue.serverTimestamp()
-    });
-}
-
-document.getElementById("occupancy")
-  .addEventListener("change", updateOccupancy);
-
-async function stopAutoSession() {
-  if (watchPositionId !== null) {
-    navigator.geolocation.clearWatch(watchPositionId);
-    watchPositionId = null;
-  }
-
-  if (currentBusDocId) {
-    await db.collection("buses")
-      .doc(currentBusDocId)
-      .delete();
-  }
-
-  localStorage.removeItem(SAVED_BUS_ID_KEY);
-
-  currentBusDocId = null;
-  previousPosition = null;
-
-  document.getElementById("driver-status").innerText =
-    "Offline";
-
-  document.getElementById("driver-status")
-    .classList.remove("active");
-
-  document.getElementById("assigned-name").innerText = "";
-
-  document.getElementById("gps-info").innerText = "";
-
-  document.getElementById("start-btn").style.display =
-    "block";
-
-  document.getElementById("stop-btn").style.display =
-    "none";
-
-  document.getElementById("terminal").disabled = false;
-}
-
-async function restorePreviousSession() {
-  const savedBusId =
-    localStorage.getItem(SAVED_BUS_ID_KEY);
-
-  if (!savedBusId) return;
-
-  try {
-    const doc =
-      await db.collection("buses")
-        .doc(savedBusId)
-        .get();
-
-    if (!doc.exists) {
-      localStorage.removeItem(SAVED_BUS_ID_KEY);
-      return;
     }
 
-    const bus = doc.data();
 
-    currentBusDocId = savedBusId;
+    // ============================================
+    // ACTIVATE BROADCAST UI
+    // ============================================
 
-    document.getElementById("terminal").value =
-      bus.startTerminal || "Ruqayyah";
+    function activateBroadcastUI(
+      busName
+    ) {
 
-    document.getElementById("occupancy").value =
-      bus.occupancy || "Normal";
+      document.getElementById(
+        "driver-status"
+      ).innerText =
+        "Broadcasting Live";
 
-    activateBroadcastUI(bus.name);
 
-    startLocationTracking();
+      document.getElementById(
+        "driver-status"
+      ).classList.add(
+        "active"
+      );
 
-  } catch (error) {
-    console.error(
-      "Could not restore previous session:",
-      error
+
+      document.getElementById(
+        "assigned-name"
+      ).innerText =
+        `Assigned: ${busName}`;
+
+
+      document.getElementById(
+        "start-btn"
+      ).style.display =
+        "none";
+
+
+      document.getElementById(
+        "stop-btn"
+      ).style.display =
+        "block";
+
+
+      document.getElementById(
+        "terminal"
+      ).disabled =
+        true;
+
+    }
+
+
+    // ============================================
+    // START GPS TRACKING
+    // ============================================
+
+    function startLocationTracking() {
+
+      if (
+        !("geolocation" in navigator)
+      ) {
+
+        alert(
+          "GPS location is unavailable on this device."
+        );
+
+        return;
+
+      }
+
+
+      // Clear old GPS watcher
+      if (
+        watchPositionId !== null
+      ) {
+
+        navigator.geolocation.clearWatch(
+          watchPositionId
+        );
+
+      }
+
+
+      // Start new GPS watcher
+      watchPositionId =
+        navigator.geolocation.watchPosition(
+
+          async (pos) => {
+
+            // ====================================
+            // GET GPS POSITION
+            // ====================================
+
+            const lat =
+              pos.coords.latitude;
+
+
+            const lng =
+              pos.coords.longitude;
+
+
+            const currentTime =
+              pos.timestamp;
+
+
+            // ====================================
+            // SMART SPEED CALCULATION
+            // ====================================
+
+            let calculatedSpeedKmH = 0;
+
+
+            // ------------------------------------
+            // Calculate speed using GPS movement
+            // ------------------------------------
+
+            if (
+              previousPosition
+            ) {
+
+              const distance =
+                getDistanceInMeters(
+
+                  previousPosition.lat,
+                  previousPosition.lng,
+
+                  lat,
+                  lng
+
+                );
+
+
+              const timeDifferenceSeconds =
+                (
+                  currentTime -
+                  previousPosition.timestamp
+                ) / 1000;
+
+
+              if (
+                timeDifferenceSeconds > 0
+              ) {
+
+                const speedMetersPerSecond =
+                  distance /
+                  timeDifferenceSeconds;
+
+
+                calculatedSpeedKmH =
+                  Math.round(
+                    speedMetersPerSecond *
+                    3.6 *
+                    10
+                  ) / 10;
+
+
+                // Ignore tiny GPS movements
+                if (
+                  distance < 3
+                ) {
+
+                  calculatedSpeedKmH = 0;
+
+                }
+
+              }
+
+            }
+
+
+            // ====================================
+            // GET BEST CURRENT SPEED
+            // ====================================
+
+            let speedKmH =
+              calculatedSpeedKmH;
+
+
+            // Some phones provide GPS speed
+            if (
+              pos.coords.speed !== null &&
+              pos.coords.speed >= 0
+            ) {
+
+              const gpsSpeedKmH =
+                Math.round(
+                  pos.coords.speed *
+                  3.6 *
+                  10
+                ) / 10;
+
+
+              if (
+                gpsSpeedKmH >=
+                  MIN_MOVEMENT_SPEED &&
+
+                gpsSpeedKmH <=
+                  MAX_REASONABLE_SPEED
+              ) {
+
+                speedKmH =
+                  gpsSpeedKmH;
+
+              }
+
+            }
+
+
+            // ====================================
+            // SMART MOVING AVERAGE
+            // ====================================
+
+            /*
+              Only meaningful movement speeds
+              are added to the history.
+
+              0 km/h is NOT added.
+
+              This prevents temporary traffic-light
+              stops from destroying the moving average.
+            */
+
+            if (
+              speedKmH >=
+                MIN_MOVEMENT_SPEED &&
+
+              speedKmH <=
+                MAX_REASONABLE_SPEED
+            ) {
+
+              speedHistory.push(
+                speedKmH
+              );
+
+
+              // Keep latest 8 readings
+              if (
+                speedHistory.length >
+                SPEED_HISTORY_SIZE
+              ) {
+
+                speedHistory.shift();
+
+              }
+
+            }
+
+
+            // ====================================
+            // CALCULATE RAW AVERAGE
+            // ====================================
+
+            if (
+              speedHistory.length > 0
+            ) {
+
+              const rawAverageSpeed =
+                speedHistory.reduce(
+                  (
+                    total,
+                    speed
+                  ) => total + speed,
+                  0
+                ) /
+                speedHistory.length;
+
+
+              // --------------------------------
+              // SMOOTH THE AVERAGE
+              // --------------------------------
+
+              if (
+                smoothedAverageSpeed === 0
+              ) {
+
+                smoothedAverageSpeed =
+                  rawAverageSpeed;
+
+              } else {
+
+                smoothedAverageSpeed =
+                  (
+                    smoothedAverageSpeed *
+                    0.7
+                  ) +
+
+                  (
+                    rawAverageSpeed *
+                    0.3
+                  );
+
+              }
+
+            }
+
+
+            // ====================================
+            // ROUND AVERAGE
+            // ====================================
+
+            const roundedAverageSpeed =
+              Math.round(
+                smoothedAverageSpeed *
+                10
+              ) / 10;
+
+
+            // ====================================
+            // SAVE POSITION FOR NEXT UPDATE
+            // ====================================
+
+            previousPosition = {
+
+              lat: lat,
+
+              lng: lng,
+
+              timestamp:
+                currentTime
+
+            };
+
+
+            // ====================================
+            // UPDATE DRIVER DISPLAY
+            // ====================================
+
+            document.getElementById(
+              "gps-info"
+            ).innerText =
+
+              `Lat: ${lat.toFixed(5)}, ` +
+
+              `Lng: ${lng.toFixed(5)} | ` +
+
+              `Current: ${speedKmH} km/h | ` +
+
+              `ETA Speed: ${roundedAverageSpeed} km/h`;
+
+
+            // ====================================
+            // CHECK BUS ID
+            // ====================================
+
+            if (
+              !currentBusDocId
+            ) {
+
+              return;
+
+            }
+
+
+            // ====================================
+            // UPDATE FIREBASE
+            // ====================================
+
+            try {
+
+              await db.collection("buses")
+                .doc(currentBusDocId)
+                .update({
+
+                  lat: lat,
+
+                  lng: lng,
+
+
+                  // Current GPS speed
+                  speedKmH:
+                    speedKmH,
+
+
+                  // Smart moving average
+                  averageSpeedKmH:
+                    roundedAverageSpeed,
+
+
+                  // Last update
+                  lastUpdated:
+                    firebase.firestore
+                      .FieldValue
+                      .serverTimestamp()
+
+                });
+
+
+            } catch (error) {
+
+              console.error(
+                "GPS update failed:",
+                error
+              );
+
+            }
+
+          },
+
+
+          // ======================================
+          // GPS ERROR
+          // ======================================
+
+          (error) => {
+
+            console.error(
+              "GPS error:",
+              error
+            );
+
+
+            document.getElementById(
+              "gps-info"
+            ).innerText =
+              "GPS Error: " +
+              error.message;
+
+          },
+
+
+          // ======================================
+          // GPS SETTINGS
+          // ======================================
+
+          {
+
+            enableHighAccuracy:
+              true,
+
+            maximumAge:
+              0,
+
+            timeout:
+              15000
+
+          }
+
+        );
+
+    }
+
+
+    // ============================================
+    // UPDATE OCCUPANCY
+    // ============================================
+
+    async function updateOccupancy() {
+
+      if (
+        !currentBusDocId
+      ) {
+
+        return;
+
+      }
+
+
+      const occupancy =
+        document.getElementById(
+          "occupancy"
+        ).value;
+
+
+      try {
+
+        await db.collection("buses")
+          .doc(currentBusDocId)
+          .update({
+
+            occupancy:
+              occupancy,
+
+            lastUpdated:
+              firebase.firestore
+                .FieldValue
+                .serverTimestamp()
+
+          });
+
+
+      } catch (error) {
+
+        console.error(
+          "Occupancy update failed:",
+          error
+        );
+
+
+        alert(
+          "Could not update occupancy.\n\n" +
+          error.message
+        );
+
+      }
+
+    }
+
+
+    // Occupancy dropdown listener
+    document.getElementById(
+      "occupancy"
+    ).addEventListener(
+      "change",
+      updateOccupancy
     );
-  }
-}
 
-document.addEventListener(
-  "visibilitychange",
-  () => {
-    if (!document.hidden && currentBusDocId) {
-      /*
-        When the driver returns to the browser,
-        restart GPS tracking immediately.
-      */
 
-      startLocationTracking();
+    // ============================================
+    // STOP ROUTE BROADCAST
+    // ============================================
+
+    async function stopAutoSession() {
+
+      try {
+
+        // ----------------------------------------
+        // STOP GPS
+        // ----------------------------------------
+
+        if (
+          watchPositionId !== null
+        ) {
+
+          navigator.geolocation.clearWatch(
+            watchPositionId
+          );
+
+          watchPositionId = null;
+
+        }
+
+
+        // ----------------------------------------
+        // DELETE BUS FROM FIRESTORE
+        // ----------------------------------------
+
+        if (
+          currentBusDocId
+        ) {
+
+          await db.collection("buses")
+            .doc(currentBusDocId)
+            .delete();
+
+        }
+
+
+        // ----------------------------------------
+        // CLEAR SAVED SESSION
+        // ----------------------------------------
+
+        localStorage.removeItem(
+          SAVED_BUS_ID_KEY
+        );
+
+
+        // ----------------------------------------
+        // RESET VARIABLES
+        // ----------------------------------------
+
+        currentBusDocId = null;
+
+        previousPosition = null;
+
+        speedHistory = [];
+
+        smoothedAverageSpeed = 0;
+
+
+        // ----------------------------------------
+        // RESET UI
+        // ----------------------------------------
+
+        document.getElementById(
+          "driver-status"
+        ).innerText =
+          "Offline";
+
+
+        document.getElementById(
+          "driver-status"
+        ).classList.remove(
+          "active"
+        );
+
+
+        document.getElementById(
+          "assigned-name"
+        ).innerText =
+          "";
+
+
+        document.getElementById(
+          "gps-info"
+        ).innerText =
+          "";
+
+
+        document.getElementById(
+          "start-btn"
+        ).style.display =
+          "block";
+
+
+        document.getElementById(
+          "stop-btn"
+        ).style.display =
+          "none";
+
+
+        document.getElementById(
+          "terminal"
+        ).disabled =
+          false;
+
+
+      } catch (error) {
+
+        console.error(
+          "STOP ROUTE ERROR:",
+          error
+        );
+
+
+        alert(
+          "Could not stop the route broadcast.\n\n" +
+          error.message
+        );
+
+      }
+
     }
-  }
-);
 
-restorePreviousSession();
+
+    // ============================================
+    // RESTORE PREVIOUS SESSION
+    // ============================================
+
+    async function restorePreviousSession() {
+
+      const savedBusId =
+        localStorage.getItem(
+          SAVED_BUS_ID_KEY
+        );
+
+
+      if (
+        !savedBusId
+      ) {
+
+        return;
+
+      }
+
+
+      try {
+
+        const doc =
+          await db.collection("buses")
+            .doc(savedBusId)
+            .get();
+
+
+        // ----------------------------------------
+        // BUS NO LONGER EXISTS
+        // ----------------------------------------
+
+        if (
+          !doc.exists
+        ) {
+
+          localStorage.removeItem(
+            SAVED_BUS_ID_KEY
+          );
+
+          return;
+
+        }
+
+
+        // ----------------------------------------
+        // RESTORE BUS
+        // ----------------------------------------
+
+        const bus =
+          doc.data();
+
+
+        currentBusDocId =
+          savedBusId;
+
+
+        document.getElementById(
+          "terminal"
+        ).value =
+          bus.startTerminal ||
+          "Ruqayyah";
+
+
+        document.getElementById(
+          "occupancy"
+        ).value =
+          bus.occupancy ||
+          "Normal";
+
+
+        activateBroadcastUI(
+          bus.name
+        );
+
+
+        // Start GPS again
+        startLocationTracking();
+
+
+      } catch (error) {
+
+        console.error(
+          "Could not restore previous session:",
+          error
+        );
+
+      }
+
+    }
+
+
+    // ============================================
+    // WHEN DRIVER RETURNS TO BROWSER
+    // ============================================
+
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+
+        if (
+          !document.hidden &&
+          currentBusDocId
+        ) {
+
+          /*
+            Restart GPS when the driver
+            returns to the browser.
+          */
+
+          previousPosition = null;
+
+          startLocationTracking();
+
+        }
+
+      }
+    );
+
+
+    // ============================================
+    // CHECK FOR PREVIOUS SESSION ON PAGE LOAD
+    // ============================================
+
+    restorePreviousSession();
+
   </script>
+
 </body>
 </html>
