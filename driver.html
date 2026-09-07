@@ -27,12 +27,12 @@
     </select>
 
     <label for="occupancy">Current Occupancy:</label>
-    <select id="occupancy">
-    <option value="Low">Low</option>
-    <option value="Normal" selected>Normal</option>
-    <option value="High">High</option>
-    <option value="Full">Full</option>
-    </select>
+<select id="occupancy">
+  <option value="Low">Low</option>
+  <option value="Normal" selected>Normal</option>
+  <option value="High">High</option>
+  <option value="Full">Full</option>
+</select>
     
     <button id="start-btn" class="btn-start" onclick="startAutoSession()">▶ Start Route Broadcast</button>
     <button id="stop-btn" class="btn-stop" onclick="stopAutoSession()">⏹ Stop Route Broadcast</button>
@@ -46,107 +46,330 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
-      authDomain: "smartbus-iium.firebaseapp.com",
-      projectId: "smartbus-iium",
-      storageBucket: "smartbus-iium.firebasestorage.app",
-      messagingSenderId: "920517840888",
-      appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
-      measurementId: "G-EDHGR3H4X3"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+const firebaseConfig = {
+  apiKey: "AIzaSyDUUEf8fK2pKNGZQOcMnLL5QucEveF28wM",
+  authDomain: "smartbus-iium.firebaseapp.com",
+  projectId: "smartbus-iium",
+  storageBucket: "smartbus-iium.firebasestorage.app",
+  messagingSenderId: "920517840888",
+  appId: "1:920517840888:web:1e3ce74245408cdf6e500d",
+  measurementId: "G-EDHGR3H4X3"
+};
 
-    let currentBusDocId = null;
-    let watchPositionId = null;
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-    async function startAutoSession() {
-      const selectedTerminal = document.getElementById("terminal").value;
+let currentBusDocId = null;
+let watchPositionId = null;
+let previousPosition = null;
 
-      // 1. Check active buses for this terminal
-      const snapshot = await db.collection("buses")
-        .where("startTerminal", "==", selectedTerminal)
-        .get();
+const SAVED_BUS_ID_KEY = "smartbus_current_bus_id";
 
-      // 2. Gather currently assigned numbers
-      const activeNumbers = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.busNumber) activeNumbers.push(data.busNumber);
-      });
+function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
 
-      // 3. Find lowest free slot (1, 2, 3...)
-      let assignedNumber = 1;
-      while (activeNumbers.includes(assignedNumber)) {
-        assignedNumber++;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function startAutoSession() {
+  const selectedTerminal = document.getElementById("terminal").value;
+  const selectedOccupancy = document.getElementById("occupancy").value;
+
+  const snapshot = await db.collection("buses")
+    .where("startTerminal", "==", selectedTerminal)
+    .get();
+
+  const activeNumbers = [];
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+
+    if (data.busNumber) {
+      activeNumbers.push(data.busNumber);
+    }
+  });
+
+  let assignedNumber = 1;
+
+  while (activeNumbers.includes(assignedNumber)) {
+    assignedNumber++;
+  }
+
+  const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
+
+  currentBusDocId =
+    `bus_${selectedTerminal.toLowerCase().replace(/\s+/g, '_')}_${assignedNumber}`;
+
+  await db.collection("buses").doc(currentBusDocId).set({
+    name: autoBusName,
+    startTerminal: selectedTerminal,
+    busNumber: assignedNumber,
+    lat: 3.2592484,
+    lng: 101.7343945,
+    speedKmH: 0,
+    occupancy: selectedOccupancy,
+    hasStartedFromRuqayyah: true,
+    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  localStorage.setItem(SAVED_BUS_ID_KEY, currentBusDocId);
+
+  activateBroadcastUI(autoBusName);
+  startLocationTracking();
+}
+
+function activateBroadcastUI(busName) {
+  document.getElementById("driver-status").innerText =
+    "Broadcasting Live";
+
+  document.getElementById("driver-status").classList.add("active");
+
+  document.getElementById("assigned-name").innerText =
+    `Assigned: ${busName}`;
+
+  document.getElementById("start-btn").style.display = "none";
+
+  document.getElementById("stop-btn").style.display = "block";
+
+  document.getElementById("terminal").disabled = true;
+}
+
+function startLocationTracking() {
+  if (!("geolocation" in navigator)) {
+    alert("GPS location is unavailable on this device.");
+    return;
+  }
+
+  if (watchPositionId !== null) {
+    navigator.geolocation.clearWatch(watchPositionId);
+  }
+
+  watchPositionId = navigator.geolocation.watchPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      const currentTime = pos.timestamp;
+
+      let speedKmH = 0;
+
+      /*
+        First priority:
+        Use calculated speed from previous movement.
+
+        This allows walking speeds to be detected even when
+        pos.coords.speed is unavailable.
+      */
+
+      if (previousPosition) {
+        const distance = getDistanceInMeters(
+          previousPosition.lat,
+          previousPosition.lng,
+          lat,
+          lng
+        );
+
+        const timeDifferenceSeconds =
+          (currentTime - previousPosition.timestamp) / 1000;
+
+        if (timeDifferenceSeconds > 0) {
+          const speedMetersPerSecond =
+            distance / timeDifferenceSeconds;
+
+          speedKmH =
+            Math.round(speedMetersPerSecond * 3.6 * 10) / 10;
+
+          /*
+            Ignore tiny GPS movements.
+
+            GPS can move a few metres even when the person
+            is standing still.
+          */
+
+          if (distance < 2) {
+            speedKmH = 0;
+          }
+        }
       }
 
-      // 4. Form auto name
-      const autoBusName = `${selectedTerminal} Bus ${assignedNumber}`;
-      currentBusDocId = `bus_${selectedTerminal.toLowerCase().replace(/\s+/g, '_')}_${assignedNumber}`;
+      /*
+        If device GPS directly provides a valid speed,
+        use it when it is meaningful.
+      */
 
-      // 5. Create document in Firebase
-      await db.collection("buses").doc(currentBusDocId).set({
-        name: autoBusName,
-        startTerminal: selectedTerminal,
-        busNumber: assignedNumber,
-        lat: 3.2592484,
-        lng: 101.7343945,
-        speedKmH: 0,
-        occupancy: "Normal",
-        hasStartedFromRuqayyah: true,
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      if (
+        pos.coords.speed !== null &&
+        pos.coords.speed >= 0
+      ) {
+        const gpsSpeedKmH =
+          Math.round(pos.coords.speed * 3.6 * 10) / 10;
 
-      // UI Update
-      document.getElementById("driver-status").innerText = "Broadcasting Live";
-      document.getElementById("driver-status").classList.add("active");
-      document.getElementById("assigned-name").innerText = `Assigned: ${autoBusName}`;
-      document.getElementById("start-btn").style.display = "none";
-      document.getElementById("stop-btn").style.display = "block";
-      document.getElementById("terminal").disabled = true;
+        if (gpsSpeedKmH > 0) {
+          speedKmH = gpsSpeedKmH;
+        }
+      }
 
-      // 6. Start watching real GPS
-      if ("geolocation" in navigator) {
-        watchPositionId = navigator.geolocation.watchPosition((pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const speedKmH = Math.round((pos.coords.speed || 0) * 3.6);
+      previousPosition = {
+        lat: lat,
+        lng: lng,
+        timestamp: currentTime
+      };
 
-          document.getElementById("gps-info").innerText = `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)} | Speed: ${speedKmH} km/h`;
+      document.getElementById("gps-info").innerText =
+        `Lat: ${lat.toFixed(5)}, ` +
+        `Lng: ${lng.toFixed(5)} | ` +
+        `Speed: ${speedKmH} km/h`;
 
-          db.collection("buses").doc(currentBusDocId).update({
+      if (!currentBusDocId) return;
+
+      try {
+        await db.collection("buses")
+          .doc(currentBusDocId)
+          .update({
             lat: lat,
             lng: lng,
             speedKmH: speedKmH,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            lastUpdated:
+              firebase.firestore.FieldValue.serverTimestamp()
           });
-        }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+
+      } catch (error) {
+        console.error("GPS update failed:", error);
       }
+    },
+
+    (error) => {
+      console.error("GPS error:", error);
+
+      document.getElementById("gps-info").innerText =
+        "GPS Error: " + error.message;
+    },
+
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
     }
+  );
+}
 
-    async function stopAutoSession() {
-      if (watchPositionId) navigator.geolocation.clearWatch(watchPositionId);
+async function updateOccupancy() {
+  if (!currentBusDocId) return;
 
-      if (currentBusDocId) {
-        await db.collection("buses").doc(currentBusDocId).delete();
-        currentBusDocId = null;
-      }
+  const occupancy =
+    document.getElementById("occupancy").value;
 
-      document.getElementById("driver-status").innerText = "Offline";
-      document.getElementById("driver-status").classList.remove("active");
-      document.getElementById("assigned-name").innerText = "";
-      document.getElementById("gps-info").innerText = "";
-      document.getElementById("start-btn").style.display = "block";
-      document.getElementById("stop-btn").style.display = "none";
-      document.getElementById("terminal").disabled = false;
-    }
-
-    // Clean up if tab/browser is closed
-    window.addEventListener("beforeunload", () => {
-      stopAutoSession();
+  await db.collection("buses")
+    .doc(currentBusDocId)
+    .update({
+      occupancy: occupancy,
+      lastUpdated:
+        firebase.firestore.FieldValue.serverTimestamp()
     });
+}
+
+document.getElementById("occupancy")
+  .addEventListener("change", updateOccupancy);
+
+async function stopAutoSession() {
+  if (watchPositionId !== null) {
+    navigator.geolocation.clearWatch(watchPositionId);
+    watchPositionId = null;
+  }
+
+  if (currentBusDocId) {
+    await db.collection("buses")
+      .doc(currentBusDocId)
+      .delete();
+  }
+
+  localStorage.removeItem(SAVED_BUS_ID_KEY);
+
+  currentBusDocId = null;
+  previousPosition = null;
+
+  document.getElementById("driver-status").innerText =
+    "Offline";
+
+  document.getElementById("driver-status")
+    .classList.remove("active");
+
+  document.getElementById("assigned-name").innerText = "";
+
+  document.getElementById("gps-info").innerText = "";
+
+  document.getElementById("start-btn").style.display =
+    "block";
+
+  document.getElementById("stop-btn").style.display =
+    "none";
+
+  document.getElementById("terminal").disabled = false;
+}
+
+async function restorePreviousSession() {
+  const savedBusId =
+    localStorage.getItem(SAVED_BUS_ID_KEY);
+
+  if (!savedBusId) return;
+
+  try {
+    const doc =
+      await db.collection("buses")
+        .doc(savedBusId)
+        .get();
+
+    if (!doc.exists) {
+      localStorage.removeItem(SAVED_BUS_ID_KEY);
+      return;
+    }
+
+    const bus = doc.data();
+
+    currentBusDocId = savedBusId;
+
+    document.getElementById("terminal").value =
+      bus.startTerminal || "Ruqayyah";
+
+    document.getElementById("occupancy").value =
+      bus.occupancy || "Normal";
+
+    activateBroadcastUI(bus.name);
+
+    startLocationTracking();
+
+  } catch (error) {
+    console.error(
+      "Could not restore previous session:",
+      error
+    );
+  }
+}
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (!document.hidden && currentBusDocId) {
+      /*
+        When the driver returns to the browser,
+        restart GPS tracking immediately.
+      */
+
+      startLocationTracking();
+    }
+  }
+);
+
+restorePreviousSession();
   </script>
 </body>
 </html>
