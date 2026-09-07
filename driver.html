@@ -64,7 +64,15 @@ let watchPositionId = null;
 let previousPosition = null;
 
 const SPEED_HISTORY_SIZE = 8;
+
+// Only speeds above this are considered actual movement
+const MIN_MOVEMENT_SPEED = 0.8;
+
+// Ignore unrealistic GPS speed spikes
+const MAX_REASONABLE_SPEED = 80;
+
 let speedHistory = [];
+let smoothedAverageSpeed = 0;
 
 const SAVED_BUS_ID_KEY = "smartbus_current_bus_id";
 
@@ -173,6 +181,14 @@ function startLocationTracking() {
         pos.coords.speed is unavailable.
       */
 
+// ================================
+// SMART SPEED CALCULATION
+// ================================
+
+let calculatedSpeedKmH = 0;
+
+// Calculate speed using distance travelled
+// between the previous and current GPS positions
 if (previousPosition) {
   const distance = getDistanceInMeters(
     previousPosition.lat,
@@ -184,21 +200,38 @@ if (previousPosition) {
   const timeDifferenceSeconds =
     (currentTime - previousPosition.timestamp) / 1000;
 
+  // Only calculate if time has passed
   if (timeDifferenceSeconds > 0) {
     const speedMetersPerSecond =
       distance / timeDifferenceSeconds;
 
-    speedKmH =
+    calculatedSpeedKmH =
       Math.round(speedMetersPerSecond * 3.6 * 10) / 10;
 
-    // Ignore tiny GPS movements
-    if (distance < 2) {
-      speedKmH = 0;
+    /*
+      Ignore tiny GPS movements.
+
+      A phone may appear to move 1-3 metres
+      even when completely stationary.
+    */
+    if (distance < 3) {
+      calculatedSpeedKmH = 0;
     }
   }
 }
 
-// If the device provides a GPS speed, use it
+
+// ================================
+// GET THE BEST CURRENT SPEED
+// ================================
+
+// Start with calculated speed
+let speedKmH = calculatedSpeedKmH;
+
+/*
+  Some devices provide GPS speed directly.
+  Use it if it is reasonable.
+*/
 if (
   pos.coords.speed !== null &&
   pos.coords.speed >= 0
@@ -206,47 +239,87 @@ if (
   const gpsSpeedKmH =
     Math.round(pos.coords.speed * 3.6 * 10) / 10;
 
-  if (gpsSpeedKmH > 0) {
+  if (
+    gpsSpeedKmH >= MIN_MOVEMENT_SPEED &&
+    gpsSpeedKmH <= MAX_REASONABLE_SPEED
+  ) {
     speedKmH = gpsSpeedKmH;
   }
 }
 
 
 // ================================
-// CALCULATE MOVING AVERAGE SPEED
+// SMART MOVING AVERAGE
 // ================================
 
-speedHistory.push(speedKmH);
+/*
+  Only add meaningful movement speeds.
 
-// Keep only the latest 8 readings
-if (speedHistory.length > SPEED_HISTORY_SIZE) {
-  speedHistory.shift();
+  If the bus stops at a traffic light,
+  0 km/h is NOT added to the average.
+
+  This prevents the ETA from suddenly
+  becoming extremely inaccurate.
+*/
+if (
+  speedKmH >= MIN_MOVEMENT_SPEED &&
+  speedKmH <= MAX_REASONABLE_SPEED
+) {
+  speedHistory.push(speedKmH);
+
+  // Keep only the latest 8 movement readings
+  if (speedHistory.length > SPEED_HISTORY_SIZE) {
+    speedHistory.shift();
+  }
 }
 
-// Calculate the average
-const averageSpeedKmH =
-  speedHistory.reduce(
-    (total, speed) => total + speed,
-    0
-  ) / speedHistory.length;
 
-// Round to 1 decimal place
+/*
+  Calculate the average of meaningful
+  recent movement speeds.
+*/
+if (speedHistory.length > 0) {
+  const rawAverageSpeed =
+    speedHistory.reduce(
+      (total, speed) => total + speed,
+      0
+    ) / speedHistory.length;
+
+
+  /*
+    Gradually adjust the average.
+
+    This prevents the ETA from jumping
+    dramatically when a new speed arrives.
+  */
+  if (smoothedAverageSpeed === 0) {
+    smoothedAverageSpeed = rawAverageSpeed;
+  } else {
+    smoothedAverageSpeed =
+      (smoothedAverageSpeed * 0.7) +
+      (rawAverageSpeed * 0.3);
+  }
+}
+
 const roundedAverageSpeed =
-  Math.round(averageSpeedKmH * 10) / 10;
+  Math.round(smoothedAverageSpeed * 10) / 10;
 
 
-// Save the current position for the next update
+// ================================
+// SAVE POSITION FOR NEXT UPDATE
+// ================================
+
 previousPosition = {
   lat: lat,
   lng: lng,
   timestamp: currentTime
 };
 
-      document.getElementById("gps-info").innerText =
+document.getElementById("gps-info").innerText =
   `Lat: ${lat.toFixed(5)}, ` +
   `Lng: ${lng.toFixed(5)} | ` +
   `Current: ${speedKmH} km/h | ` +
-  `Average: ${roundedAverageSpeed} km/h`;
+  `ETA Speed: ${roundedAverageSpeed} km/h`;
 
       if (!currentBusDocId) return;
 
