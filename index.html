@@ -233,7 +233,7 @@
         stationCount++;
       }
 
-      const effectiveSpeed = (bus.speedKmH && bus.speedKmH > 5) ? bus.speedKmH : 18;
+      const effectiveSpeed = (bus.averageSpeedKmH && bus.averageSpeedKmH > 5)? bus.averageSpeedKmH: 18;
       const travelTimeMinutes = (totalDistanceMeters / 1000) / effectiveSpeed * 60;
       const dwellDelayMinutes = stationCount * STOP_DWELL_TIME_MINS;
 
