@@ -138,7 +138,7 @@
     ];
 
     const STOP_DWELL_TIME_MINS = 1;
-    const STALE_TIMEOUT_MS = 3 * 60 * 1000; // Hide bus if quiet for > 3 mins
+    const STALE_TIMEOUT_MS = 5 * 60 * 1000; // Hide bus if quiet for > 3 mins
 
     const map = L.map('map', { zoomControl: false }).setView([3.2535, 101.7340], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
