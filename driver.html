@@ -63,6 +63,9 @@ let currentBusDocId = null;
 let watchPositionId = null;
 let previousPosition = null;
 
+const SPEED_HISTORY_SIZE = 8;
+let speedHistory = [];
+
 const SAVED_BUS_ID_KEY = "smartbus_current_bus_id";
 
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
@@ -170,77 +173,99 @@ function startLocationTracking() {
         pos.coords.speed is unavailable.
       */
 
-      if (previousPosition) {
-        const distance = getDistanceInMeters(
-          previousPosition.lat,
-          previousPosition.lng,
-          lat,
-          lng
-        );
+if (previousPosition) {
+  const distance = getDistanceInMeters(
+    previousPosition.lat,
+    previousPosition.lng,
+    lat,
+    lng
+  );
 
-        const timeDifferenceSeconds =
-          (currentTime - previousPosition.timestamp) / 1000;
+  const timeDifferenceSeconds =
+    (currentTime - previousPosition.timestamp) / 1000;
 
-        if (timeDifferenceSeconds > 0) {
-          const speedMetersPerSecond =
-            distance / timeDifferenceSeconds;
+  if (timeDifferenceSeconds > 0) {
+    const speedMetersPerSecond =
+      distance / timeDifferenceSeconds;
 
-          speedKmH =
-            Math.round(speedMetersPerSecond * 3.6 * 10) / 10;
+    speedKmH =
+      Math.round(speedMetersPerSecond * 3.6 * 10) / 10;
 
-          /*
-            Ignore tiny GPS movements.
+    // Ignore tiny GPS movements
+    if (distance < 2) {
+      speedKmH = 0;
+    }
+  }
+}
 
-            GPS can move a few metres even when the person
-            is standing still.
-          */
+// If the device provides a GPS speed, use it
+if (
+  pos.coords.speed !== null &&
+  pos.coords.speed >= 0
+) {
+  const gpsSpeedKmH =
+    Math.round(pos.coords.speed * 3.6 * 10) / 10;
 
-          if (distance < 2) {
-            speedKmH = 0;
-          }
-        }
-      }
+  if (gpsSpeedKmH > 0) {
+    speedKmH = gpsSpeedKmH;
+  }
+}
 
-      /*
-        If device GPS directly provides a valid speed,
-        use it when it is meaningful.
-      */
 
-      if (
-        pos.coords.speed !== null &&
-        pos.coords.speed >= 0
-      ) {
-        const gpsSpeedKmH =
-          Math.round(pos.coords.speed * 3.6 * 10) / 10;
+// ================================
+// CALCULATE MOVING AVERAGE SPEED
+// ================================
 
-        if (gpsSpeedKmH > 0) {
-          speedKmH = gpsSpeedKmH;
-        }
-      }
+speedHistory.push(speedKmH);
 
-      previousPosition = {
-        lat: lat,
-        lng: lng,
-        timestamp: currentTime
-      };
+// Keep only the latest 8 readings
+if (speedHistory.length > SPEED_HISTORY_SIZE) {
+  speedHistory.shift();
+}
+
+// Calculate the average
+const averageSpeedKmH =
+  speedHistory.reduce(
+    (total, speed) => total + speed,
+    0
+  ) / speedHistory.length;
+
+// Round to 1 decimal place
+const roundedAverageSpeed =
+  Math.round(averageSpeedKmH * 10) / 10;
+
+
+// Save the current position for the next update
+previousPosition = {
+  lat: lat,
+  lng: lng,
+  timestamp: currentTime
+};
 
       document.getElementById("gps-info").innerText =
-        `Lat: ${lat.toFixed(5)}, ` +
-        `Lng: ${lng.toFixed(5)} | ` +
-        `Speed: ${speedKmH} km/h`;
+  `Lat: ${lat.toFixed(5)}, ` +
+  `Lng: ${lng.toFixed(5)} | ` +
+  `Current: ${speedKmH} km/h | ` +
+  `Average: ${roundedAverageSpeed} km/h`;
 
       if (!currentBusDocId) return;
 
       try {
         await db.collection("buses")
-          .doc(currentBusDocId)
-          .update({
-            lat: lat,
-            lng: lng,
-            speedKmH: speedKmH,
-            lastUpdated:
-              firebase.firestore.FieldValue.serverTimestamp()
-          });
+  .doc(currentBusDocId)
+  .update({
+    lat: lat,
+    lng: lng,
+
+    // Current GPS speed
+    speedKmH: speedKmH,
+
+    // Average of the latest 8 speed readings
+    averageSpeedKmH: roundedAverageSpeed,
+
+    lastUpdated:
+      firebase.firestore.FieldValue.serverTimestamp()
+  });
 
       } catch (error) {
         console.error("GPS update failed:", error);
